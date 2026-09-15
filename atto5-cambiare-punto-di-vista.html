@@ -60,6 +60,7 @@
     .draw-surface { touch-action: none; }
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -70,6 +71,7 @@
       svg { max-width: 100%; height: auto; }
       .color-grid { grid-template-columns: repeat(3, 1fr) !important; }
       .rule-row { flex-wrap: wrap; }
+      .camera-compare { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -205,12 +207,57 @@
     }
 
     /* ============================================================
-       SIMULATORE 1 — "La parabola si spezza"
+       DATI REALI — assets/frames/manifest.json → rally (fotogramma
+       "rally_bg.jpg", 1280×720, traccia della palla di uno scambio vero).
+       Copiati come costanti: mai un fetch da file:// (CORS).
+       ============================================================ */
+
+    const RALLY_BALL = [ // manifest.json → rally.ball: [numero_fotogramma, x_norm, y_norm]
+      [3,0.4093,0.7144],[6,0.413,0.699],[9,0.4183,0.6574],[12,0.4183,0.5768],[15,0.4219,0.5046],
+      [18,0.4244,0.4699],[21,0.425,0.4574],[24,0.4276,0.4529],[27,0.4292,0.4648],[30,0.4505,0.4635],
+      [33,0.4685,0.4657],[36,0.4789,0.4742],[39,0.488,0.4851],[42,0.4953,0.5],[45,0.5034,0.5236],
+      [66,0.5015,0.5227],[69,0.496,0.5065],[72,0.4921,0.4972],[75,0.4867,0.4875],[78,0.4778,0.4819],
+      [81,0.4713,0.4815],[84,0.4667,0.4843],[93,0.4404,0.5366],[105,0.4271,0.5704],[126,0.4292,0.6176],
+      [150,0.4641,0.5361],[156,0.4453,0.5361],[162,0.4068,0.5902],[165,0.4,0.6042],[168,0.3807,0.6583],
+      [171,0.375,0.6222],[174,0.3812,0.562],[177,0.3833,0.5463],[180,0.3921,0.4917],[183,0.3974,0.4615],
+      [210,0.437,0.5444],[222,0.4396,0.5028],[243,0.4083,0.6444],[264,0.4573,0.5277],[267,0.4719,0.5338],
+      [270,0.4948,0.5509],[273,0.5281,0.5824],[276,0.5284,0.5787],[282,0.5065,0.5246],[285,0.5,0.5185],
+      [288,0.4961,0.5185],[291,0.4901,0.5222],[294,0.4854,0.5315],[300,0.4766,0.5606],[312,0.4662,0.5047],
+      [363,0.3839,0.6745],[375,0.4057,0.6231],[384,0.4135,0.5185]
+    ];
+    const RALLY_TOUCHES = [15, 24, 48, 141, 156, 165, 177, 276, 309]; // manifest.json → rally.touches (in fotogrammi)
+    const RALLY_DURATION = 387; // manifest.json → rally.duration_frames
+
+    /* ============================================================
+       SLIDE 3 — "La palla non mente": traccia reale, vista statica
+       ============================================================ */
+
+    function StaticTrajectory() {
+      const poly = RALLY_BALL.map(p => `${(p[1] * 1280).toFixed(1)},${(p[2] * 720).toFixed(1)}`).join(' ');
+      const touchPts = RALLY_TOUCHES.map(t => RALLY_BALL.reduce((best, p) => Math.abs(p[0] - t) < Math.abs(best[0] - t) ? p : best));
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, maxWidth: '100%', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
+            <img src="assets/frames/rally_bg.jpg" alt="Fotogramma reale con la traccia della palla di uno scambio" draggable="false"
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '62dvh', width: 'auto', height: 'auto' }} />
+            <svg viewBox="0 0 1280 720" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+              <polyline points={poly} fill="none" stroke={colors.sun} strokeWidth="3" opacity="0.9" />
+              {RALLY_BALL.map((p, i) => <circle key={i} cx={p[1] * 1280} cy={p[2] * 720} r="3" fill={colors.sun} opacity="0.7" />)}
+              {touchPts.map((p, i) => <circle key={'t' + i} cx={p[1] * 1280} cy={p[2] * 720} r="11" fill="none" stroke={colors.teal} strokeWidth="3" />)}
+            </svg>
+          </div>
+          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+            <span style={{ color: colors.sun }}>●</span> posizione della palla, fotogramma per fotogramma &nbsp; <span style={{ color: colors.teal }}>◯</span> tocco (9 su questo scambio)
+          </p>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       SIMULATORE — "La parabola si spezza"
        ============================================================ */
 
     // Traiettoria "vera": due archi parabolici uniti con uno spigolo (il tocco) all'indice 11.
-    // Generata risolvendo y = a(x-cx)²+cy per continuità nel punto di giunzione (vedi commento
-    // nel report: stesso procedimento della V del simulatore "Trova il punto di rottura").
     const BREAK_TRAJECTORY = [
       { x: 60.0, y: 260.0 }, { x: 90.91, y: 203.21 }, { x: 121.82, y: 156.48 }, { x: 152.73, y: 119.8 },
       { x: 183.64, y: 93.18 }, { x: 214.55, y: 76.62 }, { x: 245.45, y: 70.11 }, { x: 276.36, y: 73.66 },
@@ -231,9 +278,6 @@
       const visible = BREAK_TRAJECTORY.map((p, i) => ({ ...p, i })).filter(p => !isHidden(p.i));
 
       let leftFit = null, rightFit = null, meetX = null;
-      // Con la palla nascosta il punto di contatto non è cliccabile: le due parabole si
-      // adattano ai tratti visibili prima e dopo il buco (dividere su un punto cliccato
-      // mescolerebbe i due archi e l'incrocio finirebbe lontano dal tocco vero).
       if (hideBall || chosen != null) {
         const left = hideBall ? visible.filter(p => p.i < BREAK_TRUE_INDEX) : visible.filter(p => p.i <= chosen);
         const right = hideBall ? visible.filter(p => p.i > BREAK_TRUE_INDEX) : visible.filter(p => p.i >= chosen);
@@ -286,36 +330,31 @@
     }
 
     /* ============================================================
-       SIMULATORE 2 — "Il colore della palla"
+       SIMULATORE — "Il colore della palla" (ritagli reali)
        ============================================================ */
 
-    const BALL_COLOR = [232, 219, 188];
+    // assets/crops/ball_0..2.jpg (palla vera) + fake_0..7.jpg (candidati falsi: cappellino
+    // dell'arbitro, sabbia), mescolati.
     const COLOR_CANDIDATES = [
-      { id: 0, rgb: [232, 219, 188], label: 'Palla', isBall: true },
-      { id: 1, rgb: [225, 204, 160], label: 'Sabbia' },
-      { id: 2, rgb: [210, 170, 140], label: 'Cappellino chiaro' },
-      { id: 3, rgb: [200, 60, 50], label: 'Cappellino rosso' },
-      { id: 4, rgb: [50, 90, 170], label: 'Cappellino blu' },
-      { id: 5, rgb: [190, 215, 230], label: 'Riflesso del cielo' },
-      { id: 6, rgb: [140, 140, 145], label: 'Seggiolone arbitro' },
-      { id: 7, rgb: [40, 40, 45], label: 'Ombra' },
-      { id: 8, rgb: [90, 150, 90], label: 'Linea verde' },
-      { id: 9, rgb: [245, 245, 240], label: 'Riga di campo' },
-      { id: 10, rgb: [230, 140, 60], label: 'Segnale arancione' },
-      { id: 11, rgb: [120, 90, 60], label: 'Palo della rete' }
+      { id: 0, file: 'assets/crops/fake_0.jpg', isBall: false, label: 'Cappellino' },
+      { id: 1, file: 'assets/crops/ball_0.jpg', isBall: true, label: 'Palla' },
+      { id: 2, file: 'assets/crops/fake_2.jpg', isBall: false, label: 'Sabbia' },
+      { id: 3, file: 'assets/crops/fake_3.jpg', isBall: false, label: 'Sabbia' },
+      { id: 4, file: 'assets/crops/ball_1.jpg', isBall: true, label: 'Palla' },
+      { id: 5, file: 'assets/crops/fake_4.jpg', isBall: false, label: 'Sabbia' },
+      { id: 6, file: 'assets/crops/fake_1.jpg', isBall: false, label: 'Cappellino' },
+      { id: 7, file: 'assets/crops/ball_2.jpg', isBall: true, label: 'Palla' },
+      { id: 8, file: 'assets/crops/fake_5.jpg', isBall: false, label: 'Sabbia' },
+      { id: 9, file: 'assets/crops/fake_6.jpg', isBall: false, label: 'Sabbia' },
+      { id: 10, file: 'assets/crops/fake_7.jpg', isBall: false, label: 'Sabbia' }
     ];
-    const COLOR_THRESHOLD = 20;
-    const colorDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-    const rgbStr = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 
     function ColorFilterSimulator() {
-      const [selected, setSelected] = useState(null);
       const [wrongFlash, setWrongFlash] = useState(null);
       const [filtered, setFiltered] = useState(false);
 
       const onPick = (cand) => {
         if (filtered) return;
-        setSelected(cand.id);
         if (cand.isBall) {
           setFiltered(true);
         } else {
@@ -323,36 +362,30 @@
           setTimeout(() => setWrongFlash(f => f === cand.id ? null : f), 500);
         }
       };
-      const reset = () => { setSelected(null); setFiltered(false); setWrongFlash(null); };
-
-      const kept = COLOR_CANDIDATES.filter(c => colorDist(c.rgb, BALL_COLOR) <= COLOR_THRESHOLD).length;
+      const reset = () => { setFiltered(false); setWrongFlash(null); };
+      const kept = COLOR_CANDIDATES.filter(c => c.isBall).length;
 
       return (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)' }}>Colore osservato a inizio partita:</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: rgbStr(BALL_COLOR), border: `2px solid ${colors.border}` }} />
-          </div>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            {filtered ? 'Il filtro ha scartato tutto ciò che non ha questo colore:' : 'Clicca il riquadro con lo stesso colore della palla.'}
+            {filtered ? 'Il filtro sul colore ha scartato tutto ciò che non è la palla:' : 'Clicca il ritaglio che secondo te è la palla vera.'}
           </p>
-          <div className="color-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', maxWidth: '520px', margin: '0 auto' }}>
+          <div className="color-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', maxWidth: '900px', margin: '0 auto' }}>
             {COLOR_CANDIDATES.map(c => {
-              const dist = colorDist(c.rgb, BALL_COLOR);
-              const isKept = filtered && dist <= COLOR_THRESHOLD;
-              const isDiscarded = filtered && dist > COLOR_THRESHOLD;
+              const isKept = filtered && c.isBall;
+              const isDiscarded = filtered && !c.isBall;
               return (
                 <div key={c.id} onClick={() => onPick(c)} style={{
-                  position: 'relative', aspectRatio: '1', borderRadius: '8px', cursor: filtered ? 'default' : 'pointer',
-                  background: rgbStr(c.rgb),
+                  position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', cursor: filtered ? 'default' : 'pointer',
                   border: wrongFlash === c.id ? `3px solid ${colors.danger}` : isKept ? `3px solid ${colors.teal}` : `2px solid ${colors.border}`,
-                  opacity: isDiscarded ? 0.25 : 1, filter: isDiscarded ? 'grayscale(70%)' : 'none',
+                  opacity: isDiscarded ? 0.3 : 1, filter: isDiscarded ? 'grayscale(80%)' : 'none',
                   transition: 'opacity 0.3s, filter 0.3s', minHeight: '44px'
                 }}>
+                  <img src={c.file} alt={c.label} draggable="false" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />
                   {isKept && <span style={{ position: 'absolute', top: '4px', right: '6px', fontSize: '16px' }}>✓</span>}
                   {isDiscarded && <span style={{ position: 'absolute', top: '4px', right: '6px', fontSize: '16px' }}>×</span>}
                   {filtered && (
-                    <span style={{ position: 'absolute', bottom: '2px', left: '4px', right: '4px', fontSize: '10px', color: '#000', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', padding: '1px 3px', textAlign: 'center' }}>{c.label}</span>
+                    <span style={{ position: 'absolute', bottom: '2px', left: '4px', right: '4px', fontSize: '10px', color: '#000', background: 'rgba(255,255,255,0.7)', borderRadius: '3px', padding: '1px 3px', textAlign: 'center' }}>{c.label}</span>
                   )}
                 </div>
               );
@@ -363,7 +396,7 @@
           </div>
           {filtered && (
             <Box type="success" title="Filtro applicato">
-              Su 12 candidati, il filtro sul colore ne ha tenuti solo <strong style={{ color: colors.text }}>{kept}</strong>: la palla vera. Lo stesso principio, applicato all'inizio di ogni partita, elimina la grandissima parte delle "palle fantasma".
+              Su 11 candidati, il filtro sul colore ne ha tenuti solo <strong style={{ color: colors.text }}>{kept}</strong>: la palla vera. Lo stesso principio, imparato all'inizio di ogni partita, elimina la grandissima parte delle "palle fantasma".
             </Box>
           )}
         </div>
@@ -371,7 +404,7 @@
     }
 
     /* ============================================================
-       SLIDE — illustrazione anello studente/maestro
+       ILLUSTRAZIONE — anello studente/maestro
        ============================================================ */
 
     function TeacherStudentRing() {
@@ -383,8 +416,6 @@
       ];
       const pos = a => ({ x: cx + R * Math.cos(a * Math.PI / 180), y: cy + R * Math.sin(a * Math.PI / 180) });
       const arcs = [[0, 1], [1, 2], [2, 0]];
-      // Accorcia l'inizio/fine della curva lungo la sua tangente di R (raggio del cerchio),
-      // così la freccia termina visibilmente sul bordo del cerchio invece che sotto, al centro.
       const trimStart = (p0, ctrl, r) => {
         const ux = ctrl.x - p0.x, uy = ctrl.y - p0.y;
         const norm = Math.hypot(ux, uy) || 1;
@@ -396,7 +427,7 @@
         return { x: p1.x - (ux / norm) * r, y: p1.y - (uy / norm) * r };
       };
       return (
-        <svg viewBox="0 0 700 330" style={{ width: '100%', maxHeight: '40dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+        <svg viewBox="0 0 700 330" style={{ width: '100%', maxHeight: '34dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
           <defs>
             <marker id="arrow5" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
               <path d="M0,0 L8,4 L0,8 Z" fill={colors.accent} />
@@ -410,7 +441,7 @@
             const ctrl = { x: mx + (dx / norm) * 42, y: my + (dy / norm) * 42 };
             const start = trimStart(p1, ctrl, NR);
             const end = trimEnd(ctrl, p2, NR);
-            const isBroken = i === 2; // arco "nuovo modello -> modello" spezzato dalla freccia rossa
+            const isBroken = i === 2;
             return (
               <path key={i} d={`M${start.x},${start.y} Q${ctrl.x},${ctrl.y} ${end.x},${end.y}`}
                 fill="none" stroke={isBroken ? colors.textMuted : colors.accent} strokeWidth="3"
@@ -428,7 +459,6 @@
               </g>
             );
           })}
-          {/* freccia rossa che spezza l'anello */}
           <g transform={`translate(${(pos(nodes[2].angle).x + pos(nodes[0].angle).x) / 2 - 18}, ${(pos(nodes[2].angle).y + pos(nodes[0].angle).y) / 2 - 60})`}>
             <path d="M18,0 L26,20 L18,16 L22,40 L2,14 L12,17 Z" fill={colors.danger} />
           </g>
@@ -438,7 +468,7 @@
     }
 
     /* ============================================================
-       SIMULATORE 3 — "Trova il punto di rottura" (traccia sintetica a V)
+       SIMULATORE — "Trova il punto di rottura" (V sintetica + reale)
        ============================================================ */
 
     const V_TRACE = [50.038, 48.58, 45.947, 45.117, 43.176, 41.895, 41.64, 39.983, 39.103, 38.772,
@@ -472,13 +502,11 @@
 
       return (
         <div>
-          <svg viewBox={`0 0 760 260`} style={{ width: '100%', maxHeight: '32dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            {/* punti della traccia */}
+          <svg viewBox={`0 0 760 260`} style={{ width: '100%', maxHeight: '30dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
             {V_TRACE.map(p => (
               <circle key={p.t} cx={chartX(p.t)} cy={chartY(p.y)} r={p.t === V_TRUE_K ? 5 : 4}
                 fill={p.t <= s ? colors.info : colors.coral} opacity={p.t === V_TRUE_K ? 1 : 0.85} />
             ))}
-            {/* fit sinistro/destro, disegnati sul dominio effettivo dei punti usati */}
             <path d={pathFromFit(leftFit, chartX(0), chartX(s))} fill="none" stroke={colors.info} strokeWidth="2.5" />
             <path d={pathFromFit(rightFit, chartX(s), chartX(V_TRACE.length - 1))} fill="none" stroke={colors.coral} strokeWidth="2.5" />
             <line x1={chartX(s)} y1={PAD_T - 10} x2={chartX(s)} y2={PAD_T + PLOT_H + 10} stroke={colors.sun} strokeWidth="2" strokeDasharray="4 3" />
@@ -506,29 +534,6 @@
         </div>
       );
     }
-
-    /* ============================================================
-       VARIANTE DATI VERI — traccia reale dello scambio (manifest.json)
-       ============================================================ */
-
-    // Da assets/frames/manifest.json → rally: file "rally_bg.jpg" (fotogramma d'inizio scambio,
-    // 1280×720), ball: [numero_fotogramma, x_normalizzato, y_normalizzato] sull'intero fotogramma,
-    // touches: fotogrammi in cui la palla cambia traiettoria (i tocchi). duration_frames=387.
-    const RALLY_BALL = [
-      [3,0.4093,0.7144],[6,0.413,0.699],[9,0.4183,0.6574],[12,0.4183,0.5768],[15,0.4219,0.5046],
-      [18,0.4244,0.4699],[21,0.425,0.4574],[24,0.4276,0.4529],[27,0.4292,0.4648],[30,0.4505,0.4635],
-      [33,0.4685,0.4657],[36,0.4789,0.4742],[39,0.488,0.4851],[42,0.4953,0.5],[45,0.5034,0.5236],
-      [66,0.5015,0.5227],[69,0.496,0.5065],[72,0.4921,0.4972],[75,0.4867,0.4875],[78,0.4778,0.4819],
-      [81,0.4713,0.4815],[84,0.4667,0.4843],[93,0.4404,0.5366],[105,0.4271,0.5704],[126,0.4292,0.6176],
-      [150,0.4641,0.5361],[156,0.4453,0.5361],[162,0.4068,0.5902],[165,0.4,0.6042],[168,0.3807,0.6583],
-      [171,0.375,0.6222],[174,0.3812,0.562],[177,0.3833,0.5463],[180,0.3921,0.4917],[183,0.3974,0.4615],
-      [210,0.437,0.5444],[222,0.4396,0.5028],[243,0.4083,0.6444],[264,0.4573,0.5277],[267,0.4719,0.5338],
-      [270,0.4948,0.5509],[273,0.5281,0.5824],[276,0.5284,0.5787],[282,0.5065,0.5246],[285,0.5,0.5185],
-      [288,0.4961,0.5185],[291,0.4901,0.5222],[294,0.4854,0.5315],[300,0.4766,0.5606],[312,0.4662,0.5047],
-      [363,0.3839,0.6745],[375,0.4057,0.6231],[384,0.4135,0.5185]
-    ];
-    const RALLY_TOUCHES = [15, 24, 48, 141, 156, 165, 177, 276, 309];
-    const RALLY_DURATION = 387;
 
     function RealRallyViewer() {
       const [frame, setFrame] = useState(0);
@@ -561,12 +566,10 @@
         <div>
           <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, maxWidth: '100%', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
             <img src="assets/frames/rally_bg.jpg" alt="Fotogramma d'inizio di uno scambio reale" draggable="false"
-              style={{ display: 'block', maxWidth: '100%', maxHeight: '38dvh', width: 'auto', height: 'auto' }} />
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '44dvh', width: 'auto', height: 'auto' }} />
             <svg viewBox="0 0 1280 720" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
               {poly && <polyline points={poly} fill="none" stroke={colors.sun} strokeWidth="3" opacity="0.9" />}
               {visible.map((p, i) => <circle key={i} cx={p[1] * 1280} cy={p[2] * 720} r="3" fill={colors.sun} opacity="0.7" />)}
-              {/* I fotogrammi dei tocchi non sempre hanno un campione palla esatto (es. 48, 141, 309):
-                  si usa il campione più vicino, altrimenti quei tocchi non verrebbero disegnati. */}
               {touchesReached.map(t => RALLY_BALL.reduce((best, p) => Math.abs(p[0] - t) < Math.abs(best[0] - t) ? p : best)).map((p, i) => (
                 <circle key={'t' + i} cx={p[1] * 1280} cy={p[2] * 720} r="10" fill="none" stroke={colors.teal} strokeWidth="3" />
               ))}
@@ -580,24 +583,30 @@
               <GhostButton onClick={() => { setPlaying(false); setFrame(0); }}>Ricomincia</GhostButton>
             </div>
           </div>
-          <Box type="tip" title="La traccia vera di uno scambio">
-            Ogni cerchietto pieno è la posizione della palla, presa da un fotogramma reale della demo. I cerchi vuoti sono i tocchi: si vede a occhio come la traiettoria cambi direzione esattamente lì.
-          </Box>
         </div>
       );
     }
 
     function BreakPointSlide() {
-      const [showReal, setShowReal] = useState(false);
+      const [showReal, setShowReal] = useState(true);
       return (
         <div>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            Sposta il cursore per scegliere dove "spezzare" la traccia in due parabole. L'indicatore sotto il grafico mostra, per ogni scelta possibile, quanto bene le due parabole adattate ai punti si avvicinano alla traccia reale.
-          </p>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-            <GhostButton active={showReal} onClick={() => setShowReal(r => !r)}>{showReal ? 'Torna alla traccia a V' : 'Usa la traccia reale dello scambio'}</GhostButton>
+            <GhostButton active={!showReal} onClick={() => setShowReal(r => !r)}>{showReal ? 'Prova con una traccia sintetica (a V)' : 'Torna alla traccia reale dello scambio'}</GhostButton>
           </div>
-          {showReal ? <RealRallyViewer /> : <VBreakSimulator />}
+          {showReal ? (
+            <div>
+              <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '10px' }}>Sposta il cursore lungo lo scambio reale: i cerchi vuoti sono i tocchi.</p>
+              <RealRallyViewer />
+            </div>
+          ) : (
+            <div>
+              <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
+                Sposta il cursore per scegliere dove "spezzare" la traccia in due parabole: il minimo dell'errore cade sul tocco vero.
+              </p>
+              <VBreakSimulator />
+            </div>
+          )}
         </div>
       );
     }
@@ -619,18 +628,18 @@
         </div>
       ),
 
-      // 2 - La partita B
+      // 2 - Partita B: un'inquadratura mai vista (fusione partita B + generalizzazione)
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📹</span> La partita B
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>📹</span> Partita B: un'inquadratura mai vista
           </h2>
           <Glow>
             <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
               Un video ripreso <strong style={{ color: colors.text }}>di lato</strong>, un'inquadratura che il modello non aveva mai visto. Il sistema basato sui gesti <strong style={{ color: colors.text }}>crolla</strong>: centinaia di battute e tocchi inventati.
             </p>
           </Glow>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', margin: '18px 0' }}>
+          <div className="camera-compare" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', margin: '16px 0' }}>
             <div style={{ background: colors.bgCard, border: `2px solid ${colors.teal}`, borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
               <div style={{ fontSize: '30px' }}>🎥</div>
               <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginTop: '6px' }}>Partita A (dal treppiede)</div>
@@ -642,48 +651,26 @@
               <div style={{ color: colors.danger, fontWeight: '700', marginTop: '6px' }}>Rettangoli caotici ✗</div>
             </div>
           </div>
-          <Box type="warn" title="Stessa azione, due telecamere">
-            La stessa schiacciata, la stessa fisica: cambia solo il punto di vista. Ma per un modello allenato su un'unica angolazione, è un mondo nuovo.
+          <Box type="tip" title="È overfitting">
+            Il modello aveva imparato "come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>", non cos'è davvero una schiacciata: come studiare a memoria gli esercizi del libro invece di capire il metodo.
           </Box>
         </div>
       ),
 
-      // 3 - Cos'è la generalizzazione
+      // 3 - La palla non mente (traccia reale statica)
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📚</span> Cos'è la generalizzazione
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>📍</span> La palla non mente
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-            Il modello aveva imparato "come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>", non cos'è davvero una schiacciata.
-          </p>
-          <Box type="tip" title="Un'analogia">
-            È la differenza tra <strong style={{ color: colors.text }}>studiare a memoria</strong> gli esercizi del libro di testo e <strong style={{ color: colors.text }}>capire il metodo</strong> per risolverne di nuovi. Il primo funziona solo sugli esercizi già visti (in gergo: <em>overfitting</em>); il secondo generalizza.
-          </Box>
-        </div>
-      ),
-
-      // 4 - L'idea: la palla non mente
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>💡</span> L'idea: la palla non mente
-          </h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Invece di chiedere "che gesto vedo?", chiediamo <strong style={{ color: colors.text }}>"cosa fa la palla?"</strong> Una palla in volo segue una parabola: è la gravità, non l'angolazione della telecamera.
-            </p>
-          </Glow>
+          <StaticTrajectory />
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '14px' }}>
-            Quando qualcuno la colpisce, la parabola si spezza e ne inizia una nuova. <strong style={{ color: colors.text }}>Un tocco è il momento in cui la palla cambia traiettoria.</strong>
+            Una palla in volo segue una parabola: è la gravità, non l'angolazione della telecamera. <strong style={{ color: colors.text }}>Ogni tocco è un cambio di traiettoria.</strong>
           </p>
-          <Box type="success" title="Perché funziona anche sulla partita B">
-            Vista da qualunque angolazione, la traiettoria resta una curva regolare che si spezza nel punto del tocco: la forma esatta cambia con la prospettiva, ma il punto di rottura resta riconoscibile.
-          </Box>
         </div>
       ),
 
-      // 5 - Simulatore "La parabola si spezza"
+      // 4 - Simulatore "La parabola si spezza"
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -693,89 +680,83 @@
         </div>
       ),
 
-      // 6 - Il colore della palla (narrativa + simulatore)
+      // 5 - Simulatore "Il colore della palla" (ritagli reali)
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🎨</span> Il colore della palla
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🎨</span> Simulatore — Il colore della palla
           </h2>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '16px' }}>
-            Guardando i fotogrammi abbiamo notato una cosa semplice: <strong style={{ color: colors.text }}>la palla ha lo stesso colore per tutta la partita</strong>, i falsi (cappellini, riflessi, sabbia) no. Un filtro sul colore, imparato all'inizio di ogni partita, elimina la grandissima parte delle "palle fantasma".
+            <strong style={{ color: colors.text }}>La palla ha lo stesso colore per tutta la partita</strong>, i falsi (cappellini, sabbia) no.
           </p>
           <ColorFilterSimulator />
         </div>
       ),
 
-      // 7 - Il tentativo fallito: imparare da se stessi
+      // 6 - Imparare da se stessi non basta (fusione tentativo fallito + anello)
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🔁</span> Il tentativo fallito: imparare da se stessi
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🔁</span> Imparare da se stessi non basta
           </h2>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-            Idea: usare le posizioni della palla trovate dal nostro sistema per <strong style={{ color: colors.text }}>addestrare</strong> un rilevatore di palla migliore, senza lavoro umano in più.
+            Idea: usare le posizioni della palla trovate dal nostro sistema per <strong style={{ color: colors.text }}>addestrare</strong> un rilevatore migliore, senza lavoro umano in più. Tre tentativi: <strong style={{ color: colors.text }}>nessuno ha superato il sistema di partenza.</strong>
           </p>
-          <Box type="danger" title="Tre tentativi, nessun successo">
-            Nessuno dei tre tentativi ha superato il sistema di partenza.
+          <TeacherStudentRing />
+          <Box type="tip" title="Distillazione circolare">
+            Le etichette automatiche ereditano gli stessi punti ciechi del maestro. <strong style={{ color: colors.text }}>Uno studente non può superare un maestro che gli insegna solo ciò che già sa.</strong> Serve qualcosa che spezzi il circolo: l'etichettatura umana.
           </Box>
         </div>
       ),
 
-      // 8 - Perché: lo studente e il maestro
+      // 7 - L'anomalia era il segnale (fusione racconto + simulatore, traccia reale di default)
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🎓</span> Perché: lo studente e il maestro
-          </h2>
-          <TeacherStudentRing />
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '10px' }}>
-            Le etichette automatiche contengono gli stessi punti ciechi del maestro: i casi difficili, dove sbaglia, restano senza etichetta.
-          </p>
-          <Box type="tip" title="Distillazione circolare">
-            <strong style={{ color: colors.text }}>Uno studente non può superare un maestro che gli insegna solo ciò che già sa.</strong> Serve qualcosa che spezzi il circolo: l'etichettatura umana. Anche un risultato negativo, documentato bene, vale quanto uno positivo.
-          </Box>
-        </div>
-      ),
-
-      // 9 - L'anomalia era il segnale
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🚩</span> L'anomalia era il segnale
           </h2>
           <Glow>
             <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Un allenatore segnala: <em>"Qui c'è una schiacciata evidente e il sistema non segna nulla."</em>
+              Un allenatore segnala una schiacciata che il sistema non vede: bagher e schiacciata si erano uniti in un'unica traccia a <strong style={{ color: colors.text }}>V</strong>, scartata perché nessuna parabola ci passava — insieme al tocco.
             </p>
           </Glow>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '14px' }}>
-            Indagando sui dati grezzi: il tracciamento aveva unito il bagher e la schiacciata in un'unica traccia a forma di <strong style={{ color: colors.text }}>V</strong>. Non riuscendo a farci passare una sola parabola, la buttava via tutta — e con lei il tocco.
-          </p>
-        </div>
-      ),
-
-      // 10 - Simulatore "Trova il punto di rottura"
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📉</span> Simulatore — Trova il punto di rottura
-          </h2>
           <BreakPointSlide />
         </div>
       ),
 
-      // 11 - Regole di contesto e chiusura
+      // 8 - Regole di contesto
       () => (
-        <div style={{ padding: '30px', textAlign: 'center' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Regole di contesto, e un limite onesto</h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', textAlign: 'left', maxWidth: '760px', margin: '0 auto' }}>
-            Dopo la battuta si è dentro lo scambio: una "battuta" nel mezzo dello scambio è quasi sempre un bagher o una schiacciata, e il sistema la <strong style={{ color: colors.text }}>rinomina e la segna come da verificare.</strong>
+        <div style={{ padding: '30px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>📏</span> Regole di contesto
+          </h2>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
+            Dopo la battuta si è dentro lo scambio: una "battuta" nel mezzo è quasi sempre un bagher o una schiacciata, e il sistema la <strong style={{ color: colors.text }}>rinomina e la segna come da verificare.</strong>
           </p>
           <Box type="warn" title="Un limite che nessuna regola risolve">
             Il modello dei gesti su un'inquadratura nuova continua a sbagliare la classe. L'unica cura vera è <strong style={{ color: colors.text }}>insegnargli con esempi veri di quell'inquadratura.</strong>
           </Box>
+        </div>
+      ),
+
+      // 9 - Chiusura
+      () => (
+        <div style={{ padding: '30px', textAlign: 'center' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '20px' }}>La fisica ci ha salvato, ma…</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', maxWidth: '720px', margin: '0 auto 18px' }}>
+            {[
+              'Un\'inquadratura mai vista fa crollare un sistema che ragiona per gesti: la fisica della palla no.',
+              'Una parabola che si spezza individua il tocco anche quando la palla sparisce per un istante.',
+              'Imparare dalle proprie etichette non basta: serve sempre un occhio umano che rompa il circolo.'
+            ].map((l, i) => (
+              <div key={i} style={{ display: 'flex', gap: '10px', background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                <span style={{ color: colors.accent }}>✓</span>
+                <span style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>{l}</span>
+              </div>
+            ))}
+          </div>
           <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)' }}>
+            <p style={{ color: colors.text, fontSize: 'var(--fs-lead)' }}>
               La fisica ci ha salvato dall'angolazione mai vista. Ma il pezzo che manca resta lo stesso di sempre: esempi etichettati da un occhio umano.
             </p>
           </Glow>
@@ -855,7 +836,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

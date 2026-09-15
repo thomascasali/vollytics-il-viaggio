@@ -59,6 +59,7 @@
     }
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -277,26 +278,34 @@
           <label style={{ fontSize: 'var(--fs-sm)', color: colors.textDim }}>Tolleranza: <strong style={{ color: colors.text }}>{tolerance} fotogrammi</strong></label>
           <input type="range" min="0" max="10" value={tolerance} onChange={e => setTolerance(+e.target.value)} />
 
-          <svg viewBox="0 0 400 90" style={{ width: '100%', height: 'auto', marginTop: '8px', background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: '8px' }}>
-            <line x1="20" y1="60" x2="380" y2="60" stroke={colors.border} strokeWidth="2" />
+          <svg viewBox="0 0 400 130" style={{ width: '100%', height: 'auto', marginTop: '8px', background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: '8px' }}>
+            {/* fascia di tolleranza attorno a ogni tocco vero */}
             {TRUE_TOUCHES.map((t, i) => (
-              <rect key={'tband' + i} x={px(t) - (tolerance / maxFrame) * 360} y="20" width={(tolerance * 2 / maxFrame) * 360} height="45" fill={colors.purple} opacity="0.12" />
+              <rect key={'tband' + i} x={px(t) - (tolerance / maxFrame) * 360} y="15" width={(tolerance * 2 / maxFrame) * 360} height="90" fill={colors.purple} opacity="0.12" />
             ))}
+            <line x1="20" y1="60" x2="380" y2="60" stroke={colors.border} strokeWidth="2" />
+            {/* tocchi veri: tacca sopra l'asse, numero ben distanziato in alto */}
             {TRUE_TOUCHES.map((t, i) => (
               <g key={'t' + i}>
-                <circle cx={px(t)} cy="35" r="6" fill={unmatchedTrue.includes(i) ? colors.danger : colors.success} />
-                <text x={px(t)} y="18" fontSize="9" textAnchor="middle" fill={colors.textMuted}>{t}</text>
+                <line x1={px(t)} y1="45" x2={px(t)} y2="60" stroke={unmatchedTrue.includes(i) ? colors.danger : colors.success} strokeWidth="2" />
+                <circle cx={px(t)} cy="40" r="6" fill={unmatchedTrue.includes(i) ? colors.danger : colors.success} />
+                <text x={px(t)} y="24" fontSize="10" textAnchor="middle" fill={colors.textMuted}>{t}</text>
               </g>
             ))}
+            {/* tocchi trovati: tacca sotto l'asse, numero ben distanziato in basso */}
             {FOUND_TOUCHES.map((f, i) => (
               <g key={'f' + i}>
-                <rect x={px(f) - 5} y="66" width="10" height="10" fill={unmatchedFound.includes(i) ? colors.danger : colors.info} />
-                <text x={px(f)} y="88" fontSize="9" textAnchor="middle" fill={colors.textMuted}>{f}</text>
+                <line x1={px(f)} y1="60" x2={px(f)} y2="75" stroke={unmatchedFound.includes(i) ? colors.danger : colors.info} strokeWidth="2" />
+                <rect x={px(f) - 5} y="75" width="10" height="10" fill={unmatchedFound.includes(i) ? colors.danger : colors.info} />
+                <text x={px(f)} y="103" fontSize="10" textAnchor="middle" fill={colors.textMuted}>{f}</text>
               </g>
             ))}
-            <text x="20" y="12" fontSize="9" fill={colors.textMuted}>● veri</text>
-            <text x="70" y="12" fontSize="9" fill={colors.textMuted}>■ trovati</text>
           </svg>
+          <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap', fontSize: 'var(--fs-xs)', color: colors.textMuted }}>
+            <span><span style={{ color: colors.success }}>●</span> tocco vero (rosso = mancato)</span>
+            <span><span style={{ color: colors.info }}>■</span> tocco trovato (rosso = falso allarme)</span>
+            <span><span style={{ color: colors.purple }}>▭</span> fascia di tolleranza</span>
+          </div>
           <div style={{ display: 'flex', gap: '18px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap', fontSize: 'var(--fs-sm)' }}>
             <span style={{ color: colors.success }}>VP: {tVp}</span>
             <span style={{ color: colors.danger }}>FP: {tFp}</span>
@@ -486,7 +495,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

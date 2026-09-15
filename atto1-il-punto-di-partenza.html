@@ -51,6 +51,7 @@
     h3 { font-size: var(--fs-h3); }
     p, li { line-height: var(--lh-body); }
     button { font-family: 'Inter', sans-serif; }
+    video { background: #000; }
     .bg-texture {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       opacity: 0.05;
@@ -62,6 +63,8 @@
        (unita mobile corretta anche con la barra degli indirizzi che appare/scompare). */
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
+    .two-col-media { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -71,7 +74,8 @@
       .bottom-bar button, .bottom-bar a { padding: 10px 14px !important; font-size: var(--fs-xs) !important; min-height: 44px; }
       svg { max-width: 100%; height: auto; }
       .gesture-gallery { grid-template-columns: 1fr !important; }
-      .speed-row { flex-wrap: wrap; }
+      .recap-grid { grid-template-columns: 1fr !important; }
+      .two-col-media { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -161,6 +165,14 @@
       >{children}</button>
     );
 
+    // RecapCard: usata nella slide di chiusura dell'atto per i 3 punti di recap.
+    const RecapCard = ({ n, children }) => (
+      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '16px', textAlign: 'left' }}>
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: '800', color: colors.accent, fontSize: 'var(--fs-h3)', marginBottom: '6px' }}>{n}</div>
+        <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)' }}>{children}</div>
+      </div>
+    );
+
     /* ============================================================
        DATI DAI FOTOGRAMMI REALI (da assets/frames/manifest.json)
        ============================================================ */
@@ -199,197 +211,7 @@
     ];
 
     /* ============================================================
-       SIMULATORE 1 — "Segna tu i tocchi"
-       ============================================================ */
-
-    // Sagome dei 4 giocatori (2 per squadra) sul campo visto di lato.
-    const COURT_PLAYERS = [
-      { id: 'A2', x: 150, y: 235, team: 'A' },
-      { id: 'A1', x: 280, y: 255, team: 'A' },
-      { id: 'B1', x: 520, y: 235, team: 'B' },
-      { id: 'B2', x: 650, y: 255, team: 'B' },
-    ];
-
-    // Coreografia dello scambio: waypoint successivi con istante (in secondi, a velocità "reale")
-    // e altezza dell'arco. Il primo waypoint (battuta) parte da fermo, gli altri sono i "tocchi".
-    // La squadra B riceve e deve completare il proprio giro di tocchi (bagher -> alzata ->
-    // schiacciata) prima che la palla passi dall'altra parte: per questo "Schiacciata (B1)"
-    // è un waypoint a sé, sul lato di B, e solo dopo la palla vola verso A.
-    const RALLY_WAYPOINTS = [
-      { x: 150, y: 235, t: 0,    peak: 0,   label: 'Battuta (A2)' },
-      { x: 520, y: 235, t: 1.3,  peak: 110, label: 'Bagher (B1)', touch: true },
-      { x: 650, y: 255, t: 2.0,  peak: 45,  label: 'Alzata (B2)', touch: true },
-      { x: 560, y: 205, t: 2.6,  peak: 25,  label: 'Schiacciata (B1)', touch: true },
-      { x: 280, y: 255, t: 3.9,  peak: 150, label: 'Ricezione (A1)', touch: true },
-      { x: 150, y: 235, t: 4.8,  peak: 50,  label: 'Alzata (A2)', touch: true },
-      { x: 650, y: 255, t: 6.2,  peak: 150, label: 'Fine scambio', touch: false },
-    ];
-    const TOUCHES = RALLY_WAYPOINTS.filter(w => w.touch);
-    const TOTAL_DURATION = RALLY_WAYPOINTS[RALLY_WAYPOINTS.length - 1].t;
-    const TOLERANCE = 0.32; // secondi, in tempo di simulazione
-
-    function ballPositionAt(t) {
-      for (let i = 0; i < RALLY_WAYPOINTS.length - 1; i++) {
-        const a = RALLY_WAYPOINTS[i], b = RALLY_WAYPOINTS[i + 1];
-        if (t >= a.t && t <= b.t) {
-          const frac = (t - a.t) / (b.t - a.t);
-          const x = a.x + (b.x - a.x) * frac;
-          const yLine = a.y + (b.y - a.y) * frac;
-          const arc = b.peak * 4 * frac * (1 - frac);
-          return { x, y: yLine - arc };
-        }
-      }
-      const last = RALLY_WAYPOINTS[RALLY_WAYPOINTS.length - 1];
-      return { x: last.x, y: last.y };
-    }
-
-    function PlayerShape({ x, y, team, highlight }) {
-      const c = team === 'A' ? colors.teal : colors.coral;
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <ellipse cx="0" cy="2" rx="16" ry="4" fill="#000" opacity="0.25" />
-          <rect x="-8" y="-30" width="16" height="30" rx="6" fill={highlight ? colors.sun : c} />
-          <circle cx="0" cy="-38" r="9" fill={highlight ? colors.sun : c} />
-        </g>
-      );
-    }
-
-    function BallSimulator() {
-      const [speed, setSpeed] = useState(1);
-      const [running, setRunning] = useState(false);
-      const [finished, setFinished] = useState(false);
-      const [simT, setSimT] = useState(0);
-      const [flash, setFlash] = useState(null);
-
-      // Fonte di verità unica per touchIndex/results: ref mutate in modo sincrono sia dal
-      // loop rAF sia dalla pressione tasto. Con uno stato React "specchiato" via useEffect
-      // le due scritture potevano incrociarsi (un tocco perso senza essere conteggiato):
-      // le ref dirette evitano la race perché ogni lettura vede sempre l'ultimo valore scritto.
-      const resultsRef = useRef([]); // { kind: 'preso'|'anticipo'|'ritardo'|'perso', label }
-      const touchIndexRef = useRef(0);
-      const simTRef = useRef(0);
-      const rafRef = useRef(null);
-      const startRef = useRef(null);
-
-      const reset = useCallback(() => {
-        cancelAnimationFrame(rafRef.current);
-        setRunning(false); setFinished(false); setSimT(0);
-        resultsRef.current = []; touchIndexRef.current = 0; simTRef.current = 0;
-        setFlash(null);
-        simActive = false;
-      }, []);
-
-      const start = useCallback(() => {
-        reset();
-        setRunning(true);
-        simActive = true;
-        startRef.current = performance.now();
-        const tick = (now) => {
-          const elapsed = ((now - startRef.current) / 1000) * speed;
-          // auto-miss: se uno o più tocchi attesi sono passati oltre la tolleranza senza
-          // pressione, li segna tutti persi. Un ciclo (non un solo "if") è necessario perché
-          // un frame lento o una scheda in background possono far avanzare "elapsed" oltre
-          // più tocchi in un colpo solo: con un solo "if" i tocchi saltati sparivano dal
-          // conteggio invece di finire tra i "persi".
-          let ti = touchIndexRef.current;
-          while (ti < TOUCHES.length && elapsed > TOUCHES[ti].t + TOLERANCE) {
-            resultsRef.current = [...resultsRef.current, { kind: 'perso', label: TOUCHES[ti].label }];
-            ti++;
-          }
-          touchIndexRef.current = ti;
-          simTRef.current = elapsed;
-          setSimT(elapsed);
-          if (elapsed >= TOTAL_DURATION) {
-            setRunning(false); setFinished(true);
-            simActive = false;
-            return;
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        };
-        rafRef.current = requestAnimationFrame(tick);
-      }, [speed, reset]);
-
-      useEffect(() => () => { cancelAnimationFrame(rafRef.current); simActive = false; }, []);
-
-      const registerTouch = useCallback(() => {
-        if (!running) return;
-        const ti = touchIndexRef.current;
-        if (ti >= TOUCHES.length) return;
-        const target = TOUCHES[ti];
-        const diff = simTRef.current - target.t;
-        let kind;
-        if (Math.abs(diff) <= TOLERANCE) kind = 'preso';
-        else if (diff < 0) kind = 'anticipo';
-        else kind = 'ritardo';
-        resultsRef.current = [...resultsRef.current, { kind, label: target.label }];
-        touchIndexRef.current = ti + 1;
-        setFlash(kind);
-        setTimeout(() => setFlash(f => f === kind ? null : f), 350);
-      }, [running]);
-
-      useEffect(() => {
-        const handler = (e) => {
-          if (e.code === 'Space' || e.key === ' ') {
-            e.preventDefault();
-            registerTouch();
-          }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-      }, [registerTouch]);
-
-      const ball = ballPositionAt(simT);
-      const counts = { preso: 0, anticipo: 0, ritardo: 0, perso: 0 };
-      resultsRef.current.forEach(r => counts[r.kind]++);
-
-      return (
-        <div>
-          <svg viewBox="0 0 800 300" style={{ width: '100%', maxHeight: '40dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <line x1="40" y1="260" x2="760" y2="260" stroke={colors.border} strokeWidth="3" />
-            <rect x="398" y="150" width="4" height="110" fill={colors.textMuted} />
-            <line x1="398" y1="150" x2="402" y2="150" stroke={colors.textMuted} strokeWidth="2" />
-            {[0,1,2,3,4,5].map(i => <line key={i} x1={370} y1={155+i*10} x2={430} y2={155+i*10} stroke={colors.border} strokeWidth="1" opacity="0.5" />)}
-            {COURT_PLAYERS.map(p => <PlayerShape key={p.id} {...p} highlight={false} />)}
-            <circle cx={ball.x} cy={ball.y} r="9" fill={colors.sand} stroke={colors.bg} strokeWidth="1.5" />
-          </svg>
-
-          <div className="speed-row" style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '16px 0', flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', fontWeight: '600' }}>Velocità:</span>
-            <GhostButton active={speed === 0.5} disabled={running} onClick={() => setSpeed(0.5)}>Lenta</GhostButton>
-            <GhostButton active={speed === 1} disabled={running} onClick={() => setSpeed(1)}>Reale</GhostButton>
-            <GhostButton active={speed === 2} disabled={running} onClick={() => setSpeed(2)}>×2</GhostButton>
-            <div style={{ flex: 1 }} />
-            {!running && <SolidButton onClick={start}>{finished ? 'Rigioca' : 'Avvia lo scambio'}</SolidButton>}
-            {running && <SolidButton onClick={registerTouch} bg={TEAL_SOLID}style={{ minWidth: '160px', transform: flash ? 'scale(1.05)' : 'none' }}>TOCCO! (o Spazio)</SolidButton>}
-          </div>
-
-          {flash && (
-            <div style={{ textAlign: 'center', fontWeight: '700', fontFamily: "'Montserrat', sans-serif",
-              color: flash === 'preso' ? colors.teal : flash === 'anticipo' ? colors.info : colors.warn, marginBottom: '8px' }}>
-              {flash === 'preso' ? '✓ Preso!' : flash === 'anticipo' ? '⏱ In anticipo' : '⏱ In ritardo'}
-            </div>
-          )}
-
-          {finished && (
-            <Box type={counts.perso === 0 ? 'success' : 'warn'} title="Riepilogo dello scambio">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: '10px', marginBottom: '10px' }}>
-                <div><strong style={{ color: colors.teal, fontSize: 'var(--fs-h3)' }}>{counts.preso}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>presi</div></div>
-                <div><strong style={{ color: colors.info, fontSize: 'var(--fs-h3)' }}>{counts.anticipo}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>in anticipo</div></div>
-                <div><strong style={{ color: colors.warn, fontSize: 'var(--fs-h3)' }}>{counts.ritardo}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>in ritardo</div></div>
-                <div><strong style={{ color: colors.danger, fontSize: 'var(--fs-h3)' }}>{counts.perso}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>persi</div></div>
-              </div>
-              <p><strong style={{ color: colors.text }}>E questo era un solo scambio.</strong> Una partita ne ha decine, un torneo centinaia.</p>
-            </Box>
-          )}
-          {!running && !finished && (
-            <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)' }}>Premi "Avvia lo scambio", poi segna ogni tocco appena la palla arriva su un giocatore: con il pulsante o con la barra spaziatrice.</p>
-          )}
-        </div>
-      );
-    }
-
-    /* ============================================================
-       SIMULATORE 2 — "Disegna il rettangolo"
+       SIMULATORE 1 — "Disegna il rettangolo"
        ============================================================ */
 
     function iou(a, b) {
@@ -462,7 +284,7 @@
             }}
           >
             <img src="assets/frames/gesture_SPIKE_zoom.jpg" alt="Fotogramma reale di una schiacciata" draggable="false"
-              style={{ display: 'block', maxWidth: '100%', maxHeight: '46dvh', width: 'auto', height: 'auto', pointerEvents: 'none' }} />
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '58dvh', width: 'auto', height: 'auto', pointerEvents: 'none' }} />
             {box && (
               <div style={{
                 position: 'absolute', left: `${box.x * 100}%`, top: `${box.y * 100}%`,
@@ -496,16 +318,12 @@
             <SolidButton onClick={() => setShowTrue(s => !s)} bg={TEAL_SOLID}>{showTrue ? 'Nascondi' : 'Mostra'} il rettangolo vero</SolidButton>
             <GhostButton onClick={() => { setBox(null); setShowTrue(false); }}>Ricomincia</GhostButton>
           </div>
-
-          <Box type="tip" title="Perché conta">
-            Ecco il mestiere che ha permesso alla macchina di imparare: migliaia di rettangoli come questo, disegnati a mano, uno per fotogramma.
-          </Box>
         </div>
       );
     }
 
     /* ============================================================
-       SLIDE 4 — Zoom progressivo sui pixel
+       SIMULATORE 2 — Zoom progressivo sui pixel
        ============================================================ */
 
     function PixelZoom() {
@@ -524,20 +342,20 @@
           </div>
 
           {level === 1 && (
-            <div onClick={() => setLevel(2)} style={{ cursor: 'pointer', maxWidth: '420px', margin: '0 auto' }}>
-              <img src="assets/frames/gesture_SPIKE_zoom.jpg" alt="Fotogramma della schiacciata" style={{ width: '100%', maxHeight: '42dvh', objectFit: 'contain', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+            <div onClick={() => setLevel(2)} style={{ cursor: 'pointer', maxWidth: '1100px', margin: '0 auto' }}>
+              <img src="assets/frames/gesture_SPIKE_zoom.jpg" alt="Fotogramma della schiacciata" style={{ width: '100%', height: 'auto', maxHeight: '62dvh', objectFit: 'contain', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
               <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '10px' }}>Livello 1 di 3 — un fotogramma della demo. Clicca per avvicinarti alla palla.</p>
             </div>
           )}
           {level === 2 && (
-            <div onClick={() => setLevel(3)} style={{ cursor: 'pointer', maxWidth: '320px', margin: '0 auto' }}>
-              <img src="assets/frames/pixel_crop.jpg" alt="Ritaglio ravvicinato attorno alla palla" style={{ width: '100%', maxHeight: '38dvh', objectFit: 'contain', borderRadius: '8px', border: `1px solid ${colors.border}`, imageRendering: 'pixelated' }} />
+            <div onClick={() => setLevel(3)} style={{ cursor: 'pointer', maxWidth: '700px', margin: '0 auto' }}>
+              <img src="assets/frames/pixel_crop.jpg" alt="Ritaglio ravvicinato attorno alla palla" style={{ width: '100%', height: 'auto', maxHeight: '62dvh', objectFit: 'contain', borderRadius: '8px', border: `1px solid ${colors.border}`, imageRendering: 'pixelated' }} />
               <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '10px' }}>Livello 2 di 3 — un ritaglio attorno alla palla. Clicca per vedere cosa vede davvero il computer.</p>
             </div>
           )}
           {level === 3 && (
-            <div style={{ maxWidth: '340px', margin: '0 auto' }}>
-              <svg viewBox="0 0 160 160" style={{ width: '100%', maxHeight: '42dvh', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <svg viewBox="0 0 160 160" style={{ width: '100%', maxHeight: '54dvh', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                 {PIXEL_GRID.map((row, ry) => row.map((rgb, rx) => (
                   <rect key={ry + '-' + rx} x={rx * 10} y={ry * 10} width="10" height="10"
                     fill={`rgb(${rgb[0]},${rgb[1]},${rgb[2]})`}
@@ -564,7 +382,7 @@
     }
 
     /* ============================================================
-       SLIDE 6 — Galleria dei 5 gesti
+       Galleria dei 5 gesti
        ============================================================ */
 
     function GestureGallery() {
@@ -581,7 +399,48 @@
     }
 
     /* ============================================================
-       SLIDES
+       Diagramma SVG — la catena appesa ai gesti
+       ============================================================ */
+
+    function PipelineDiagram() {
+      const nodes = [
+        { icon: '🎥', label: 'Video' },
+        { icon: '🔎', label: 'Rilevamenti', sub: 'gesti, palla, giocatori' },
+        { icon: '📏', label: 'Regole' },
+        { icon: '⛓️', label: 'Scambi' },
+        { icon: '🔢', label: 'Punteggio' }
+      ];
+      const w = 920, h = 210, boxW = 152, boxH = 92;
+      const gap = (w - nodes.length * boxW) / (nodes.length + 1);
+      const boxY = 92;
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', maxHeight: '36dvh' }}>
+          <defs>
+            <marker id="arrowRed1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={colors.danger} /></marker>
+            <marker id="arrowGray1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={colors.textMuted} /></marker>
+          </defs>
+          <path d={`M ${gap * 2 + boxW * 1.5} 46 Q ${w / 2} 4 ${gap * 5 + boxW * 4.5} 46`} fill="none" stroke={colors.danger} strokeWidth="2.5" markerEnd="url(#arrowRed1)" />
+          <text x={w / 2} y="20" textAnchor="middle" fontSize="13" fontWeight="700" fill={colors.danger} fontFamily="Montserrat, sans-serif">se sbaglia un gesto, sbaglia tutto a valle</text>
+          {nodes.map((n, i) => {
+            const x = gap + i * (boxW + gap);
+            return (
+              <g key={i}>
+                <rect x={x} y={boxY} width={boxW} height={boxH} rx="10" fill={colors.bgCard} stroke={colors.border} strokeWidth="1.5" />
+                <text x={x + boxW / 2} y={boxY + 30} textAnchor="middle" fontSize="22">{n.icon}</text>
+                <text x={x + boxW / 2} y={boxY + 54} textAnchor="middle" fontSize="14" fontWeight="700" fill={colors.text} fontFamily="Montserrat, sans-serif">{n.label}</text>
+                {n.sub && <text x={x + boxW / 2} y={boxY + 72} textAnchor="middle" fontSize="9.5" fill={colors.textMuted}>{n.sub}</text>}
+                {i < nodes.length - 1 && (
+                  <line x1={x + boxW} y1={boxY + boxH / 2} x2={x + boxW + gap} y2={boxY + boxH / 2} stroke={colors.textMuted} strokeWidth="2" markerEnd="url(#arrowGray1)" />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    /* ============================================================
+       SLIDES (7)
        ============================================================ */
 
     const slides = [
@@ -597,121 +456,92 @@
         </div>
       ),
 
-      // 2 - La domanda di un allenatore
+      // 2 - Cosa vuole sapere un allenatore
       () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🙋</span> La domanda di un allenatore
+        <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+            <span style={{ fontSize: '28px' }}>🙋</span> Cosa vuole sapere un allenatore
           </h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Dopo una partita un allenatore vuole sapere: <strong style={{ color: colors.text }}>quante battute</strong>, chi riceve male, da dove attacca l'avversario, come si è costruito ogni punto.
-            </p>
-          </Glow>
-          <Box type="warn" title="Come si fa oggi">
-            Si guarda il video e si prendono appunti a mano: <strong style={{ color: colors.text }}>ore per ogni partita.</strong>
-          </Box>
-          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '10px' }}>
-            Nella prossima slide proviamo a farlo noi, a mano, per un solo scambio.
+          <video controls muted loop playsinline preload="metadata" src="assets/clips/clip_rally.mp4"
+            style={{ display: 'block', width: '100%', maxWidth: '1100px', height: 'auto', maxHeight: '62dvh', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: colors.textDim, fontSize: 'var(--fs-body)', textAlign: 'center', margin: '16px 0 6px' }}>
+            <div>chi ha battuto e come hanno ricevuto</div>
+            <div>quanti tocchi e di che tipo</div>
+            <div>come è finito il punto</div>
+          </div>
+          <p style={{ textAlign: 'center', color: colors.textMuted, fontSize: 'var(--fs-sm)' }}>
+            Una partita ha decine di scambi, un torneo centinaia. Oggi si fa guardando il video e prendendo appunti.
           </p>
         </div>
       ),
 
-      // 3 - Simulatore "Segna tu i tocchi"
+      // 3 - Cosa vede un computer
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🏐</span> Simulatore — Segna tu i tocchi
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>👁️</span> Cosa vede un computer
           </h2>
-          <BallSimulator />
-        </div>
-      ),
-
-      // 4 - Cosa vuol dire "guardare" per un computer + zoom pixel
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>👁️</span> Che cosa vuol dire "guardare" per un computer
-          </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px' }}>
-            Un video è una sequenza di immagini, 25 al secondo. Un'immagine è una griglia di numeri. Il computer non "vede" una palla: <strong style={{ color: colors.text }}>vede pixel.</strong>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '10px', textAlign: 'center' }}>
+            Un video è una sequenza di immagini; un'immagine è una griglia di numeri. Il computer non "vede" una palla: <strong style={{ color: colors.text }}>vede pixel.</strong>
           </p>
           <PixelZoom />
         </div>
       ),
 
-      // 5 - Il lavoro di partenza: una tesi
+      // 4 - Il lavoro di partenza: una tesi
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🎓</span> Il lavoro di partenza: una tesi
           </h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Un lavoro di tesi universitaria, poi diventato un articolo scientifico in preparazione, aveva costruito il primo sistema: dal video di una sola telecamera riconosceva <strong style={{ color: colors.text }}>giocatori, palla e cinque gesti</strong> (battuta, bagher, alzata, schiacciata, muro) e il campo.
-            </p>
-          </Glow>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '14px' }}>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '8px' }}>
+            Un lavoro di tesi universitaria, poi diventato un articolo scientifico in preparazione, aveva costruito un primo sistema: dal video di una telecamera riconosceva <strong style={{ color: colors.text }}>giocatori, palla, cinque gesti</strong> e il campo.
+          </p>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px' }}>
             Poi, con delle regole, raggruppava i gesti in scambi e stimava il punteggio.
           </p>
-        </div>
-      ),
-
-      // 6 - Come aveva imparato (galleria)
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>✏️</span> Come aveva imparato
-          </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px' }}>
-            Decine di migliaia di immagini <strong style={{ color: colors.text }}>etichettate a mano</strong>: qualcuno aveva disegnato un rettangolo attorno a ogni palla, giocatore e gesto, e scritto cos'era. Il modello impara da questi esempi.
-          </p>
           <GestureGallery />
-          <Box type="info" title="Regola d'oro">
-            Le immagini della stessa partita non stanno mai sia tra quelle per imparare sia tra quelle per verificare.
-          </Box>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '16px', justifyContent: 'center', textAlign: 'center' }}>
+            <span>💡</span><span>Regola d'oro: le immagini della stessa partita non stanno mai sia tra quelle per imparare sia tra quelle per verificare.</span>
+          </div>
         </div>
       ),
 
-      // 7 - Simulatore "Disegna il rettangolo"
+      // 5 - Come si insegna: decine di migliaia di rettangoli
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>✍️</span> Simulatore — Disegna il rettangolo
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>✍️</span> Come si insegna: decine di migliaia di rettangoli
           </h2>
           <RectSimulator />
-        </div>
-      ),
-
-      // 8 - Cosa non sapeva fare
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🕳️</span> Cosa non sapeva fare
-          </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-            Funzionava bene sui video simili a quelli su cui aveva imparato. Ma:
-          </p>
-          <ul style={{ color: colors.textDim, lineHeight: '2.2', paddingLeft: '20px', fontSize: 'var(--fs-body)', marginTop: '10px' }}>
-            <li>la palla la vedeva <strong style={{ color: colors.text }}>a tratti</strong>;</li>
-            <li>i giocatori <strong style={{ color: colors.text }}>non avevano un'identità stabile</strong>;</li>
-            <li><strong style={{ color: colors.text }}>tutto il resto dipendeva dai gesti</strong>: se sbagliava un gesto, sbagliava lo scambio e il punteggio.</li>
-          </ul>
-          <Box type="danger" title="Il punto debole">
-            Un prototipo di ricerca dimostra un'idea. Un allenatore ha bisogno di qualcosa che funzioni ogni giorno, su ogni video.
+          <Box type="tip" title="Perché conta">
+            Ecco il mestiere che ha permesso alla macchina di imparare: migliaia di rettangoli come questo, disegnati a mano, uno per fotogramma.
           </Box>
         </div>
       ),
 
-      // 9 - Chiusura
+      // 6 - Tutto in fila, tutto appeso ai gesti
       () => (
-        <div style={{ padding: '30px', textAlign: 'center' }}>
+        <div style={{ padding: '30px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🔗</span> Tutto in fila, tutto appeso ai gesti
+          </h2>
+          <PipelineDiagram />
+          <p style={{ textAlign: 'center', color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '10px' }}>
+            palla vista a tratti · identità instabile · dipendenza dai gesti
+          </p>
+        </div>
+      ),
+
+      // 7 - Chiusura
+      () => (
+        <div style={{ padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Da qui è partito il nostro lavoro</h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)' }}>
-              Prendere un prototipo di ricerca e trasformarlo in qualcosa che un allenatore possa usare davvero.
-            </p>
-          </Glow>
+          <div className="recap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', maxWidth: '860px', margin: '0 auto 20px' }}>
+            <RecapCard n="1">Un allenatore ha bisogno di risposte precise, oggi trovate a mano guardando ore di video.</RecapCard>
+            <RecapCard n="2">Un prototipo di tesi riconosceva già giocatori, palla, gesti e campo — ma solo su video simili a quelli visti.</RecapCard>
+            <RecapCard n="3">Tutto dipendeva dai gesti: un errore lì si propagava fino al punteggio.</RecapCard>
+          </div>
           <Box type="tip" title="La lezione dell'atto">
             Un buon progetto nasce da una domanda concreta di qualcuno che ha un problema vero.
           </Box>
@@ -741,11 +571,11 @@
           if (simActive) return; // un simulatore sta usando la tastiera
           const evTarget = e.target;
           const evTag = evTarget && evTarget.tagName ? evTarget.tagName.toLowerCase() : '';
-          const isFormField = evTag === 'input' || evTag === 'textarea' || evTag === 'select' || evTag === 'button'
+          const isFormField = evTag === 'input' || evTag === 'textarea' || evTag === 'select' || evTag === 'button' || evTag === 'video'
             || (evTarget && evTarget.isContentEditable) || (evTarget && evTarget.getAttribute && evTarget.getAttribute('role') === 'slider');
-          // Lascia campi, slider e bottoni utilizzabili da tastiera (Spazio attiva il bottone,
-          // le frecce muovono lo slider); ESC torna sempre all'indice tranne quando un simulatore
-          // sta davvero catturando la tastiera (simActive, controllato sopra).
+          // Lascia campi, slider, bottoni e il player video utilizzabili da tastiera (Spazio
+          // attiva/mette in pausa, le frecce muovono lo slider); ESC torna sempre all'indice
+          // tranne quando un simulatore sta davvero catturando la tastiera (simActive, sopra).
           if (isFormField && e.key !== 'Escape') return;
           if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
           if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
@@ -793,7 +623,7 @@
               nascosto sotto la bottom-bar, qualunque sia l'altezza che le barre assumono
               (es. quando i bottoni vanno a capo su schermi stretti). */}
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

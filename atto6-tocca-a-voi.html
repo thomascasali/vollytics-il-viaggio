@@ -59,6 +59,7 @@
     .draw-surface { touch-action: none; }
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -506,32 +507,6 @@
       );
     }
 
-    function WhoTeachesCards() {
-      const [open, setOpen] = useState(null);
-      const items = [
-        { icon: '🧑‍🏫', title: 'Allenatori', text: 'Conoscono il gioco meglio di chiunque: riconoscono al volo un gesto ambiguo o una scelta tattica.' },
-        { icon: '🎓', title: 'Studenti', text: 'Imparano come funziona davvero un sistema di intelligenza artificiale mentre contribuiscono con dati veri.' },
-        { icon: '🏐', title: 'Appassionati e giocatori', text: 'Vedono dettagli di gioco che sfuggono a chi il volley non lo pratica.' },
-      ];
-      return (
-        <div>
-          <div className="cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-            {items.map((it, i) => (
-              <button key={i} onClick={() => setOpen(open === i ? null : i)} style={{
-                textAlign: 'left', cursor: 'pointer', background: colors.bgCard,
-                border: `1px solid ${open === i ? colors.accent : colors.border}`, borderRadius: '10px', padding: '18px', minHeight: '44px'
-              }}>
-                <div style={{ fontSize: '30px', marginBottom: '8px' }}>{it.icon}</div>
-                <div style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, color: colors.text, fontSize: 'var(--fs-body)' }}>{it.title}</div>
-                {open === i && <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginTop: '10px' }}>{it.text}</div>}
-              </button>
-            ))}
-          </div>
-          <Box type="tip" title="Serve occhio, non codice">Serve occhio, attenzione e pazienza. Non serve saper programmare.</Box>
-        </div>
-      );
-    }
-
     /* ============================================================
        SLIDES
        ============================================================ */
@@ -565,6 +540,9 @@
             <span style={{ fontSize: '28px' }}>🙋</span> Perché serve l'etichettatura umana
           </h2>
           <WhyHumanCards />
+          <Box type="tip" title="Chi può farlo">
+            Allenatori, studenti, appassionati: serve occhio, attenzione e pazienza. Non serve saper programmare.
+          </Box>
         </div>
       ),
 
@@ -579,17 +557,7 @@
         </div>
       ),
 
-      // 4 - Chi può insegnare alla macchina
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🧑‍🤝‍🧑</span> Chi può insegnare alla macchina
-          </h2>
-          <WhoTeachesCards />
-        </div>
-      ),
-
-      // 5 - Cos'è un'etichetta ben fatta
+      // 4 - Cos'è un'etichetta ben fatta
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -602,7 +570,7 @@
         </div>
       ),
 
-      // 6 - Regole (1/2)
+      // 5 - Regole (1/2)
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -615,7 +583,7 @@
         </div>
       ),
 
-      // 7 - Regole (2/2)
+      // 6 - Regole (2/2)
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -629,7 +597,7 @@
         </div>
       ),
 
-      // 8 - Simulatore "Il fotogramma giusto"
+      // 7 - Simulatore "Il fotogramma giusto"
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -639,7 +607,7 @@
         </div>
       ),
 
-      // 9 - Quiz finale
+      // 8 - Quiz finale
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -649,7 +617,7 @@
         </div>
       ),
 
-      // 10 - Chiusura del viaggio
+      // 9 - Chiusura del viaggio
       () => (
         <div style={{ padding: '30px', textAlign: 'center' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Le sei lezioni del viaggio</h2>
@@ -739,7 +707,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

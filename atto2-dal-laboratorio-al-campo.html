@@ -51,6 +51,7 @@
     h3 { font-size: var(--fs-h3); }
     p, li { line-height: var(--lh-body); }
     button { font-family: 'Inter', sans-serif; }
+    video { background: #000; }
     .bg-texture {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       opacity: 0.05;
@@ -62,21 +63,8 @@
        slide in mezzo scorre da sola. Così nessun contenuto finisce mai sotto le barre. */
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
-    input[type=range] {
-      -webkit-appearance: none; appearance: none;
-      width: 100%; height: 36px; background: transparent; cursor: pointer; touch-action: none;
-    }
-    input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--border); }
-    input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: var(--border); }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none; width: 28px; height: 28px; border-radius: 50%;
-      background: var(--thumb, #ffffff); border: 3px solid #0e1728; margin-top: -10px; cursor: pointer;
-    }
-    input[type=range]::-moz-range-thumb {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--thumb, #ffffff);
-      border: 3px solid #0e1728; cursor: pointer;
-    }
-    input[type=range]:disabled { opacity: 1; cursor: not-allowed; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
+    .two-col-media { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -88,7 +76,8 @@
       .assembly-grid { grid-template-columns: 1fr !important; }
       .stations-row { justify-content: flex-start !important; }
       .spike-grid { grid-template-columns: repeat(2, 1fr) !important; }
-      .speed-row { flex-wrap: wrap; }
+      .recap-grid { grid-template-columns: 1fr !important; }
+      .two-col-media { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -211,6 +200,14 @@
       >{children}</button>
     );
 
+    // RecapCard: usata nella slide di chiusura dell'atto per i 3 punti di recap.
+    const RecapCard = ({ n, children }) => (
+      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '16px', textAlign: 'left' }}>
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: '800', color: colors.accent, fontSize: 'var(--fs-h3)', marginBottom: '6px' }}>{n}</div>
+        <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)' }}>{children}</div>
+      </div>
+    );
+
     /* ============================================================
        DATI DAI FOTOGRAMMI REALI (da assets/frames/manifest.json, voce "BUMP")
        Rimappatura frame intero -> ritaglio zoom, stessa formula usata in Atto 1:
@@ -298,11 +295,11 @@
             ))}
           </div>
 
-          <div className="assembly-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'start' }}>
+          <div className="assembly-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '20px', alignItems: 'start' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, maxWidth: '100%', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
                 <img src="assets/frames/gesture_BUMP_zoom.jpg" alt="Fotogramma reale della demo, un bagher" draggable="false"
-                  style={{ display: 'block', maxWidth: '100%', maxHeight: '40dvh', width: 'auto', height: 'auto' }} />
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '52dvh', width: 'auto', height: 'auto' }} />
                 {/* Rilevamento: box da manifest.json (sempre visibili da qui in poi) */}
                 <DetectionBox box={BUMP_GESTURE_BOX} color={colors.sun} label="gesto" />
                 <DetectionBox box={BUMP_BALL_BOX} color={colors.teal} label="palla" />
@@ -335,16 +332,12 @@
               )}
             </div>
           </div>
-
-          <Box type="tip" title="Il contratto dei dati">
-            Ogni stazione legge e arricchisce la <strong style={{ color: colors.text }}>stessa scheda</strong>: parlare la stessa lingua permette a persone e moduli diversi di lavorare insieme.
-          </Box>
         </div>
       );
     }
 
     /* ============================================================
-       ILLUSTRAZIONE — "Il contratto dei dati" (scheda compilata a mano)
+       ILLUSTRAZIONE — "La scheda di ogni istante" (scheda compilata a mano)
        ============================================================ */
     function DataContractCard() {
       const fields = [
@@ -417,7 +410,7 @@
               {survived} di {SPIKES.length}
             </div>
             {mode === 'OR'
-              ? <p>Con "oppure" basta una sola condizione vera per scartare: quasi tutte le schiacciate spariscono. Un solo operatore logico può svuotare un'intera classe di dati.</p>
+              ? <p>Con "oppure" basta una sola condizione vera per scartare: quasi tutte le schiacciate spariscono.</p>
               : <p>Con "e" servono entrambe le condizioni insieme: la regola scarta solo i casi davvero dubbi.</p>}
           </Box>
         </div>
@@ -425,34 +418,7 @@
     }
 
     /* ============================================================
-       ILLUSTRAZIONE — Dal computer alla palestra (mockup app)
-       ============================================================ */
-    function AppMockup() {
-      return (
-        <svg viewBox="0 0 360 260" style={{ width: '100%', maxWidth: '420px', display: 'block', margin: '0 auto', maxHeight: '38dvh' }}>
-          <rect x="20" y="10" width="320" height="240" rx="18" fill={colors.bgCard} stroke={colors.border} strokeWidth="2" />
-          <rect x="36" y="28" width="288" height="140" rx="6" fill={colors.bg} />
-          {/* "video" con box */}
-          <rect x="150" y="70" width="46" height="70" fill="none" stroke={colors.sun} strokeWidth="1.5" />
-          <text x="150" y="66" fontSize="9" fill={colors.sun} fontFamily="Montserrat, sans-serif">schiacciata</text>
-          <circle cx="230" cy="110" r="5" fill={colors.sand} />
-          <rect x="90" y="90" width="30" height="55" fill="none" stroke={colors.info} strokeWidth="1.5" />
-          {/* filtri */}
-          <rect x="36" y="176" width="60" height="20" rx="10" fill={colors.accent} opacity="0.25" />
-          <text x="46" y="189" fontSize="9" fill={colors.accent} fontFamily="Inter, sans-serif" fontWeight="700">filtri</text>
-          <rect x="102" y="176" width="90" height="20" rx="10" fill={colors.bgLight} />
-          <text x="112" y="189" fontSize="9" fill={colors.textDim} fontFamily="Inter, sans-serif">vista dall'alto</text>
-          {/* timeline */}
-          {Array.from({ length: 14 }).map((_, i) => (
-            <rect key={i} x={36 + i * 21} y="212" width="18" height="14" rx="3"
-              fill={[3, 7, 10].includes(i) ? colors.teal : colors.bgLight} />
-          ))}
-        </svg>
-      );
-    }
-
-    /* ============================================================
-       SLIDES
+       SLIDES (7)
        ============================================================ */
     const slides = [
       // 1 - Titolo
@@ -462,112 +428,104 @@
           <div style={{ fontSize: 'var(--fs-xs)', color: colors.accent, textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '16px', fontWeight: '700' }}>{ACT_LABEL}</div>
           <h1 style={{ fontSize: 'var(--fs-h1)', fontWeight: '700', background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentAlt})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '16px' }}>{ACT_TITLE}</h1>
           <p style={{ fontSize: 'var(--fs-lead)', color: colors.textDim, maxWidth: '620px', lineHeight: 'var(--lh-body)' }}>
-            Un prototipo di ricerca dimostra un'idea. Un prodotto deve funzionare ogni giorno. Ecco come abbiamo provato a farlo diventare tale — fino al primo errore, istruttivo, che avrebbe complicato tutto.
+            Un prototipo di ricerca dimostra un'idea. Un prodotto deve funzionare ogni giorno. Ecco come lo abbiamo trasformato.
           </p>
         </div>
       ),
 
-      // 2 - Mettere ordine
+      // 2 - Una catena di montaggio a stadi
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🏭</span> Mettere ordine
+          <h2 style={{ color: colors.accent, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>⚙️</span> Una catena di montaggio a stadi
           </h2>
-          <Glow color={colors.accent}>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Il codice di ricerca serve a <strong style={{ color: colors.text }}>dimostrare un'idea</strong>; un prodotto deve funzionare ogni giorno, su ogni video.
-            </p>
-          </Glow>
-          <Box type="info" title="Primo passo">
-            Dividere il lavoro in <strong style={{ color: colors.text }}>stadi</strong>, come una catena di montaggio: rilevamento, campo, pulizia, scambi, punteggio. Ogni stadio riceve una scheda e la restituisce più ricca.
-          </Box>
-          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '10px' }}>
-            Nella prossima slide segui un fotogramma reale attraverso le 5 stazioni.
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '16px' }}>
+            Il codice di ricerca dimostra un'idea; un prodotto deve funzionare ogni giorno. L'abbiamo diviso in stadi, come una catena di montaggio: clicca le stazioni in ordine.
           </p>
-        </div>
-      ),
-
-      // 3 - Simulatore "La catena di montaggio"
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>⚙️</span> Simulatore — La catena di montaggio
-          </h2>
-          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginBottom: '14px' }}>Clicca le stazioni in ordine: a ognuna la scheda del fotogramma si arricchisce.</p>
           <AssemblyLineSimulator />
         </div>
       ),
 
-      // 4 - Il contratto dei dati
+      // 3 - La scheda di ogni istante
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📋</span> Il contratto dei dati
+            <span style={{ fontSize: '28px' }}>📋</span> La scheda di ogni istante
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '20px' }}>
-            Tutti gli stadi si passano la stessa "scheda": <strong style={{ color: colors.text }}>in questo istante ci sono questi giocatori, questa palla, questi gesti, questo punteggio.</strong> Parlare la stessa lingua permette a persone e moduli diversi di lavorare insieme.
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '20px', textAlign: 'center' }}>
+            Ogni stadio legge e arricchisce la stessa scheda: parlare la stessa lingua permette a persone e moduli diversi di lavorare insieme.
           </p>
           <DataContractCard />
         </div>
       ),
 
-      // 5 - Il bug dell'OR
+      // 4 - Il bug dell'OR
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🐛</span> Il bug dell'OR
           </h2>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '16px' }}>
-            Durante la migrazione è emerso un errore nascosto: una condizione di scarto scritta con "oppure" invece che con "e" cancellava quasi tutte le schiacciate.
+            Una condizione di scarto scritta con "oppure" invece che con "e" cancellava quasi tutte le schiacciate. Otto casi, due modi di scrivere la stessa regola.
           </p>
           <SpikeDiscardGame />
         </div>
       ),
 
-      // 6 - Dal computer alla palestra
+      // 5 - Da minuti a secondi: nasce l'app
       () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>💻</span> Dal computer alla palestra
+        <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+            <span style={{ fontSize: '28px' }}>💻</span> Da minuti a secondi: nasce l'app
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '16px' }}>
-            Su un normale computer l'analisi di una clip breve richiedeva molti minuti. Spostata su un server con scheda grafica (GPU), diventa questione di secondi.
-          </p>
-          <AppMockup />
-          <Box type="tip" title="Nasce una web app">
-            Carichi il video, aspetti, guardi il risultato con filtri, timeline e vista dall'alto.
-          </Box>
+          <img src="assets/app/app_player.jpg" alt="Schermata reale dell'app: player con overlay, timeline e filtri" draggable="false"
+            style={{ display: 'block', width: '100%', maxWidth: '1100px', height: 'auto', maxHeight: '62dvh', objectFit: 'contain', margin: '0 auto 16px', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: colors.textDim, fontSize: 'var(--fs-body)', textAlign: 'center' }}>
+            <div>carichi il video</div>
+            <div>l'analisi gira su un server con scheda grafica: da molti minuti a secondi</div>
+            <div>guardi il risultato con filtri e timeline</div>
+          </div>
         </div>
       ),
 
-      // 7 - Il primo feedback vero
+      // 6 - Cosa vede l'allenatore
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🙋</span> Il primo feedback vero
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🏐</span> Cosa vede l'allenatore
           </h2>
+          <div className="two-col-media">
+            <div style={{ textAlign: 'center' }}>
+              <video controls muted loop playsinline preload="metadata" src="assets/clips/clip_rally_annotated.mp4"
+                style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '58dvh', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+              <p style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '8px' }}>Lo stesso scambio come lo mostra il sistema: giocatori e palla seguiti tocco per tocco.</p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <img src="assets/app/app_analytics.jpg" alt="Radar 2D e statistiche per giocatore" draggable="false"
+                style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '58dvh', objectFit: 'contain', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+              <p style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '8px' }}>Radar 2D, statistiche per giocatore, lista dei rally con punteggio.</p>
+            </div>
+          </div>
+        </div>
+      ),
+
+      // 7 - Chiusura: Il primo feedback vero
+      () => (
+        <div style={{ padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px' }}>Il primo feedback vero</h2>
           <Glow color={colors.accent}>
             <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)', fontStyle: 'italic' }}>
               "Troppe battute. E qui segni un bagher, ma la palla non l'ha nemmeno toccata."
             </p>
           </Glow>
-          <Box type="warn" title="Il punto cieco del laboratorio">
-            In laboratorio questi errori non si vedevano, perché nessuno guardava le partite con l'occhio di chi allena davvero.
-          </Box>
-        </div>
-      ),
-
-      // 8 - Chiusura
-      () => (
-        <div style={{ padding: '30px', textAlign: 'center' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Un sistema che funzionava da un capo all'altro</h2>
-          <Glow color={colors.accent}>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)' }}>
-              Ora bisognava migliorarlo. E qui abbiamo commesso il primo, istruttivo errore.
-            </p>
-          </Glow>
+          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', margin: '12px 0 20px' }}>In laboratorio questi errori non si vedevano.</p>
+          <div className="recap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', maxWidth: '860px', margin: '0 auto 20px' }}>
+            <RecapCard n="1">Un prototipo di ricerca dimostra un'idea; un prodotto deve funzionare ogni giorno, su ogni video.</RecapCard>
+            <RecapCard n="2">Dividerlo in stadi con una scheda condivisa lo ha reso costruibile un pezzo alla volta.</RecapCard>
+            <RecapCard n="3">Un solo operatore logico sbagliato può cancellare un'intera classe di dati.</RecapCard>
+          </div>
           <Box type="tip" title="La lezione dell'atto">
-            Prima si fa funzionare il tubo da un capo all'altro, poi si ottimizza. E un modello che nessuno usa non riceve feedback.
+            Prima si fa funzionare il tubo da un capo all'altro, poi si ottimizza. Un modello che nessuno usa non riceve feedback.
           </Box>
         </div>
       )
@@ -594,11 +552,11 @@
           if (simActive) return; // un simulatore sta usando la tastiera
           const evTarget = e.target;
           const evTag = evTarget && evTarget.tagName ? evTarget.tagName.toLowerCase() : '';
-          const isFormField = evTag === 'input' || evTag === 'textarea' || evTag === 'select' || evTag === 'button'
+          const isFormField = evTag === 'input' || evTag === 'textarea' || evTag === 'select' || evTag === 'button' || evTag === 'video'
             || (evTarget && evTarget.isContentEditable) || (evTarget && evTarget.getAttribute && evTarget.getAttribute('role') === 'slider');
-          // Lascia campi, slider e bottoni utilizzabili da tastiera (Spazio attiva il bottone,
-          // le frecce muovono lo slider); ESC torna sempre all'indice tranne quando un simulatore
-          // sta davvero catturando la tastiera (simActive, controllato sopra).
+          // Lascia campi, slider, bottoni e il player video utilizzabili da tastiera (Spazio
+          // attiva/mette in pausa, le frecce muovono lo slider); ESC torna sempre all'indice
+          // tranne quando un simulatore sta davvero catturando la tastiera (simActive, sopra).
           if (isFormField && e.key !== 'Escape') return;
           if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
           if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
@@ -641,7 +599,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

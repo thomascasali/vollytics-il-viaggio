@@ -30,9 +30,9 @@ sopra:
 | # | File | Titolo | Accent | Icona | Slide |
 |---|------|--------|--------|-------|-------|
 | — | `index.html` | Vollytics — Il viaggio | — | 🏐 | dashboard |
-| 1 | `atto1-il-punto-di-partenza.html` | Il punto di partenza | coral `#EF5540` | 🎯 | 9 |
-| 2 | `atto2-dal-laboratorio-al-campo.html` | Dal laboratorio al campo | sole `#F6A93B` | 🧪 | ~8 |
-| 3 | `atto3-quando-sembrava-funzionare.html` | Quando sembrava funzionare | rosso `#e0563a` | 📉 | ~10 |
+| 1 | `atto1-il-punto-di-partenza.html` | Il punto di partenza | coral `#EF5540` | 🎯 | 7 |
+| 2 | `atto2-dal-laboratorio-al-campo.html` | Dal laboratorio al campo | sole `#F6A93B` | 🧪 | 7 |
+| 3 | `atto3-quando-sembrava-funzionare.html` | Quando sembrava funzionare | rosso `#e0563a` | 📉 | 8 |
 | 4 | `atto4-il-gioco-ha-le-sue-regole.html` | Il gioco ha le sue regole | teal `#1FA9A0` | 📐 | ~11 |
 | 5 | `atto5-cambiare-punto-di-vista.html` | Cambiare punto di vista | azzurro `#4e93b8` | 🔄 | ~11 |
 | 6 | `atto6-tocca-a-voi.html` | Tocca a voi | sabbia `#E7C58C` | ✍️ | ~10 |
@@ -47,6 +47,10 @@ sopra:
   scambio e la griglia di pixel. **Solo fonte di immagini reali ammessa**; tutto il resto
   (partite A/B, schemi, simulatori) è illustrazione SVG.
 - `_lavoro/` (non pubblicato, in `.gitignore`): sceneggiatura di lavoro, non è contenuto pubblico.
+- Simulatori tenuti in Atto 1/2/3 (v2, BRIEF_V2.md): pixel a 3 livelli e disegna il
+  rettangolo (Atto 1); catena di montaggio e bug dell'OR (Atto 2); precision/recall e
+  validazione-test (Atto 3). Eliminati: "segna tu i tocchi", "il cursore magico" (nessun
+  dato reale, solo illustrativi/giocattolo — vedi BRIEF_V2.md).
 
 ## Design System (brand Vollytics, tema scuro)
 
@@ -81,7 +85,9 @@ Font: Montserrat (titoli, peso 700/800) + Inter (testo) da Google Fonts, fallbac
      `colors.bg` dà più contrasto sopra un dato sfondo, e lo usa automaticamente — utile
      quando l'accent è chiaro (es. il sole `#F6A93B`) e va abbinato a testo scuro invece che
      scurirlo. Definizione di riferimento (`relLuminance`/`contrastRatio`/`bestTextColor`)
-     in cima al file, prima di `colors`.
+     in cima al file, prima di `colors`. Verificato per l'Atto 2: `accentSolid` resta il sole
+     non scurito (`#F6A93B`, testo bianco sopra darebbe solo ≈2.0:1); `bestTextColor` sceglie
+     `colors.bg` (`#0e1728`) come testo, che dà ≈9.1:1 (ottimo AA).
   2. **Coppia fissa verificata** (atto1, atto4, atto5, atto6, appendice A, appendice B):
      quando l'accent è già scuro/saturo abbastanza da reggere testo bianco una volta
      scurito in `accentSolid`, si fissa `color: '#ffffff'` (o `colors.accentText` quando
@@ -92,6 +98,7 @@ Font: Montserrat (titoli, peso 700/800) + Inter (testo) da Google Fonts, fallbac
      | File | accentSolid | Contrasto |
      |------|-------------|-----------|
      | Atto 1 (coral) | `#b83a29` | ≈5.71:1 |
+     | Atto 3 (rosso) | `#A8412C` | ≈6.07:1 |
      | Atto 4 (teal) | `#177f78` | ≈4.83:1 |
      | Atto 5 (azzurro) | `#3e7693` | ≈4.98:1 |
      | Atto 6 (sabbia, testo scuro `accentText` invece di bianco) | `#E7C58C` | ≈10.9:1 |
@@ -120,13 +127,18 @@ Font: Montserrat (titoli, peso 700/800) + Inter (testo) da Google Fonts, fallbac
 
 ## Struttura slide
 
+Principio (v2, BRIEF_V2.md): **ogni slide (tranne titolo/chiusura) mostra un artefatto
+reale — video, fotogramma, schermata dell'app, traccia, grafico o simulatore — con **max
+~60 parole di testo**. Niente slide fatte di sola frase in un box nel vuoto.
+
 Ogni atto segue questa struttura:
 1. Slide titolo (centrata, icona, nome atto, titolo, sottotitolo)
 2. Slide concetti/narrazione (con box informativi e, dove serve, diagrammi SVG o fotogrammi reali)
 3. Slide simulatore/i interattivo/i
-4. Slide di chiusura atto con la lezione dell'atto e collegamento all'atto successivo
+4. Slide di chiusura atto: UNA sola slide con titolo forte + 3 punti di recap + box con la
+   lezione dell'atto + collegamento all'atto successivo (non più frase+lezione separate)
 
-L'Atto 1 (9 slide, 2 simulatori) è il modello di riferimento: stesso motore slide, stesso
+L'Atto 1 (7 slide, 2 simulatori) è il modello di riferimento: stesso motore slide, stesso
 top-bar/bottom-bar, stessi componenti `Box`/`Glow`/`SolidButton`/`GhostButton`, per tutti gli
 atti successivi.
 

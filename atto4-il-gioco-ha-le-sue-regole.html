@@ -60,6 +60,7 @@
     .draw-surface { touch-action: none; }
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -68,8 +69,8 @@
       .bottom-bar { gap: 8px !important; padding: 0 10px !important; }
       .bottom-bar button, .bottom-bar a { padding: 10px 14px !important; font-size: var(--fs-xs) !important; min-height: 44px; }
       svg { max-width: 100%; height: auto; }
-      .rule-row { flex-wrap: wrap; }
-      .domino-row { grid-template-columns: 1fr !important; }
+      .domino-row { grid-template-columns: repeat(2, 1fr) !important; }
+      .court-compare { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -158,10 +159,10 @@
     );
 
     /* ============================================================
-       OMOGRAFIA — usata dai simulatori "Dalla foto alla mappa" e
-       "L'ombra della palla". DLT (Direct Linear Transform) a 4 punti:
-       8 incognite (h11..h32, h33 fissato a 1), risolte con eliminazione
-       di Gauss a pivot parziale su un sistema lineare 8x8.
+       OMOGRAFIA — DLT (Direct Linear Transform) a 4 punti: 8 incognite
+       (h11..h32, h33 fissato a 1), risolte con eliminazione di Gauss a
+       pivot parziale su un sistema lineare 8x8. Usata dal simulatore
+       "L'ombra della palla".
        ============================================================ */
 
     function solveHomography(src, dst) {
@@ -194,106 +195,124 @@
     }
 
     /* ============================================================
-       SIMULATORE 1 — "Dalla foto alla mappa" (omografia a 4 punti)
+       DATI REALI — assets/data/court.json (fotogramma reale con 4
+       giocatori, campo di beach volley 8 m × 16 m). Mai un fetch da
+       file:// (CORS): copiati come costanti.
        ============================================================ */
 
-    // Angoli del campo nell'illustrazione in prospettiva (coordinate immagine).
-    // Ordine fisso, richiesto anche allo studente: 1 vicino-sx, 2 vicino-dx, 3 lontano-dx, 4 lontano-sx.
-    const COURT_IMG_CORNERS = [
-      { x: 90, y: 360 }, { x: 690, y: 360 }, { x: 520, y: 120 }, { x: 260, y: 120 }
+    const FRAME_W = 1280, FRAME_H = 720; // court.json → risoluzione del fotogramma di riferimento
+
+    // court.json → corners_norm: 4 angoli del campo, normalizzati sul fotogramma.
+    // Ordine: ①vicino-sinistra (x negativo: esce dall'inquadratura) ②vicino-destra
+    // ③lontano-destra ④lontano-sinistra.
+    const REAL_CORNERS_NORM = [
+      [-0.0484, 0.9028], [0.8290, 0.8769], [0.5537, 0.6305], [0.3925, 0.6363]
     ];
-    const CORNER_HINTS = ['① vicino a sinistra', '② vicino a destra', '③ lontano a destra', '④ lontano a sinistra'];
-    // Rettangolo di destinazione: un campo di beach volley reale, 16 × 8 metri.
-    const COURT_DEST_M = [{ x: 0, y: 8 }, { x: 16, y: 8 }, { x: 16, y: 0 }, { x: 0, y: 0 }];
-    // Giocatori: posizioni fisse (in pixel immagine) sul terreno del campo, nella stessa scena.
-    const PERSPECTIVE_PLAYERS = [
-      { id: 'A1', x: 230, y: 330, team: 'A' }, { id: 'A2', x: 380, y: 300, team: 'A' },
-      { id: 'B1', x: 430, y: 190, team: 'B' }, { id: 'B2', x: 330, y: 175, team: 'B' }
+    const REAL_CORNERS_PX = REAL_CORNERS_NORM.map(([x, y]) => ({ x: x * FRAME_W, y: y * FRAME_H }));
+    const CORNER_HINTS = ['vicino a sinistra (fuori inquadratura)', 'vicino a destra', 'lontano a destra', 'lontano a sinistra'];
+    // Rettangolo di destinazione: campo reale, 8 m di larghezza × 16 m di lunghezza,
+    // stesso ordine dei 4 angoli sopra.
+    const COURT_DEST_M = [{ x: 0, y: 16 }, { x: 8, y: 16 }, { x: 8, y: 0 }, { x: 0, y: 0 }];
+
+    // court.json → players: box normalizzati [x1,y1,x2,y2] dei 4 giocatori sul fotogramma.
+    const REAL_PLAYERS_NORM = [
+      [0.3635, 0.5681, 0.4094, 0.8255],
+      [0.288, 0.5574, 0.337, 0.8102],
+      [0.4135, 0.5764, 0.4271, 0.6421],
+      [0.3979, 0.5731, 0.4115, 0.6417]
     ];
-    const MAP_SCALE = 25; // px per metro, solo per il disegno della vista dall'alto
+    // court.json → players_court: stessi 4 giocatori, posizione a terra in metri (già
+    // calcolata dal sistema tramite l'omografia sopra) sul campo 8×16.
+    const REAL_PLAYERS_COURT = [
+      [2.774, 14.78], [3.796, 15.187], [1.84, 2.315], [1.105, 2.552]
+    ];
 
-    function CourtScenePerspective({ step, onCornerClick }) {
-      const poly = COURT_IMG_CORNERS.map(p => `${p.x},${p.y}`).join(' ');
-      return (
-        <svg viewBox="0 0 780 420" style={{ width: '100%', maxHeight: '38dvh', background: 'linear-gradient(180deg,#0b2f3a,#123a2c)', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-          <polygon points={poly} fill="#d9b877" opacity="0.28" stroke={colors.sand} strokeWidth="2" />
-          {/* rete, a metà tra i due lati lunghi */}
-          <line x1={(COURT_IMG_CORNERS[0].x + COURT_IMG_CORNERS[3].x) / 2} y1={(COURT_IMG_CORNERS[0].y + COURT_IMG_CORNERS[3].y) / 2}
-                x2={(COURT_IMG_CORNERS[1].x + COURT_IMG_CORNERS[2].x) / 2} y2={(COURT_IMG_CORNERS[1].y + COURT_IMG_CORNERS[2].y) / 2}
-                stroke={colors.textDim} strokeWidth="3" />
-          {PERSPECTIVE_PLAYERS.map(p => (
-            <g key={p.id} transform={`translate(${p.x},${p.y})`}>
-              <ellipse cx="0" cy="2" rx="14" ry="4" fill="#000" opacity="0.25" />
-              <rect x="-7" y="-26" width="14" height="26" rx="5" fill={p.team === 'A' ? colors.teal : colors.coral} />
-              <circle cx="0" cy="-32" r="8" fill={p.team === 'A' ? colors.teal : colors.coral} />
-            </g>
-          ))}
-          {COURT_IMG_CORNERS.map((c, i) => {
-            const done = i < step;
-            const active = i === step;
-            return (
-              <g key={i} style={{ cursor: active ? 'pointer' : 'default' }} onClick={() => active && onCornerClick(i)}>
-                <circle cx={c.x} cy={c.y} r="26" fill="transparent" />
-                <circle cx={c.x} cy={c.y} r={active ? 13 : 9} fill={done ? colors.teal : active ? colors.sun : colors.bgLight}
-                  stroke={active ? colors.sun : colors.border} strokeWidth={active ? 3 : 1.5}>
-                  {active && <animate attributeName="r" values="10;15;10" dur="1s" repeatCount="indefinite" />}
-                </circle>
-                {done && <text x={c.x} y={c.y + 5} textAnchor="middle" fontSize="12" fontWeight="700" fill={colors.bg}>✓</text>}
-              </g>
-            );
-          })}
-        </svg>
-      );
-    }
+    /* ============================================================
+       SIMULATORE 1 — "Dalla foto alla mappa" (dati e fotogramma reali)
+       ============================================================ */
 
-    function TopDownResult({ H }) {
-      const W = 16 * MAP_SCALE, Hh = 8 * MAP_SCALE;
-      return (
-        <svg viewBox={`0 0 ${W} ${Hh}`} style={{ width: '100%', maxHeight: '30dvh', background: '#0b2f3a', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-          <rect x="1" y="1" width={W - 2} height={Hh - 2} fill="none" stroke={colors.sand} strokeWidth="2" />
-          <line x1={W / 2} y1="0" x2={W / 2} y2={Hh} stroke={colors.textDim} strokeWidth="2" />
-          {PERSPECTIVE_PLAYERS.map(p => {
-            const m = applyHomography(H, p.x, p.y);
-            return <circle key={p.id} cx={m.x * MAP_SCALE} cy={m.y * MAP_SCALE} r="9" fill={p.team === 'A' ? colors.teal : colors.coral} stroke={colors.bg} strokeWidth="1.5" />;
-          })}
-        </svg>
-      );
-    }
+    const CLICK_ORDER = [1, 2, 3]; // i 3 angoli visibili nel fotogramma; il ④ esce dall'inquadratura
 
-    function HomographySimulator() {
-      const [step, setStep] = useState(0);
-      const [H, setH] = useState(null);
+    function RealCourtSimulator() {
+      const [clicked, setClicked] = useState([]);
+      const done3 = clicked.length === 3;
+      const nextIdx = CLICK_ORDER[clicked.length];
 
-      const onCornerClick = (i) => {
-        const nextStep = step + 1;
-        setStep(nextStep);
-        if (nextStep === 4) {
-          const computed = solveHomography(COURT_IMG_CORNERS, COURT_DEST_M);
-          setH(computed);
-        }
+      const onClickCorner = (i) => {
+        if (i !== nextIdx) return;
+        setClicked(c => [...c, i]);
       };
-      const reset = () => { setStep(0); setH(null); };
+      const reset = () => setClicked([]);
+
+      const MAP_SCALE = 15, COURT_W_M = 8, COURT_L_M = 16;
+      const p0 = REAL_CORNERS_PX[0];
+      const edgeX = Math.max(6, p0.x);
 
       return (
         <div>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '10px' }}>
-            {step < 4
-              ? <>Clicca il pallino che pulsa: è l'angolo {CORNER_HINTS[step]} del campo.</>
-              : <>Fatto! Con soli 4 punti il sistema ha calcolato la trasformazione (<strong style={{ color: colors.text }}>omografia</strong>) che porta dal punto di vista della telecamera alla vista dall'alto.</>}
+            {!done3
+              ? <>Clicca il pallino che pulsa: è l'angolo <strong style={{ color: colors.text }}>{CORNER_HINTS[nextIdx]}</strong> del campo, sul fotogramma reale.</>
+              : <>Il quarto angolo esce dall'inquadratura: il sistema lo ricava comunque, dagli altri tre e dalla forma nota del campo.</>}
           </p>
-          <CourtScenePerspective step={step} onCornerClick={onCornerClick} />
-          {H && (
-            <div style={{ marginTop: '14px' }}>
-              <h3 style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginBottom: '8px', fontWeight: '600' }}>Vista dall'alto ricostruita</h3>
-              <TopDownResult H={H} />
+          <div className="court-map-row" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '3 1 380px', minWidth: '280px' }}>
+              <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, maxWidth: '100%' }}>
+                <img src="assets/frames/frame_court.jpg" alt="Fotogramma reale con quattro giocatori in campo" draggable="false"
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '58dvh', width: 'auto', height: 'auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+                <svg viewBox={`0 0 ${FRAME_W} ${FRAME_H}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                  <defs>
+                    <marker id="arrowOff4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                      <path d="M0,0 L8,4 L0,8 Z" fill={colors.teal} />
+                    </marker>
+                  </defs>
+                  {done3 && (
+                    <polygon points={REAL_CORNERS_PX.map(p => `${p.x},${p.y}`).join(' ')} fill={colors.sun} fillOpacity="0.15" stroke={colors.sun} strokeWidth="3" />
+                  )}
+                  {[1, 2, 3].map(i => {
+                    const p = REAL_CORNERS_PX[i];
+                    const isDone = clicked.includes(i);
+                    const isActive = i === nextIdx && !done3;
+                    return (
+                      <g key={i} style={{ cursor: isActive ? 'pointer' : 'default' }} onClick={() => onClickCorner(i)}>
+                        <circle cx={p.x} cy={p.y} r="30" fill="transparent" />
+                        <circle cx={p.x} cy={p.y} r={isActive ? 14 : 9} fill={isDone ? colors.teal : isActive ? colors.sun : colors.bgLight}
+                          stroke={isActive ? colors.sun : colors.border} strokeWidth={isActive ? 3 : 1.5}>
+                          {isActive && <animate attributeName="r" values="11;17;11" dur="1s" repeatCount="indefinite" />}
+                        </circle>
+                        {isDone && <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="12" fontWeight="700" fill={colors.bg}>✓</text>}
+                      </g>
+                    );
+                  })}
+                  {done3 && (
+                    <g>
+                      <line x1={edgeX + 60} y1={p0.y} x2={edgeX} y2={p0.y} stroke={colors.teal} strokeWidth="2" strokeDasharray="6 5" markerEnd="url(#arrowOff4)" />
+                      <text x={edgeX + 64} y={p0.y + 5} fontSize="16" fill={colors.teal}>④ qui, fuori campo</text>
+                    </g>
+                  )}
+                </svg>
+              </div>
             </div>
-          )}
+            <div style={{ flex: '2 1 260px', minWidth: '220px', maxWidth: '380px', textAlign: 'center', margin: '0 auto' }}>
+              <h3 style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginBottom: '8px', fontWeight: '600' }}>Vista dall'alto ricostruita (campo 8 × 16 m)</h3>
+              <svg viewBox={`0 0 ${COURT_W_M * MAP_SCALE} ${COURT_L_M * MAP_SCALE}`} style={{ width: '100%', display: 'block', margin: '0 auto', maxHeight: '52dvh', background: '#0b2f3a', borderRadius: '8px', border: `1px solid ${colors.border}`, opacity: done3 ? 1 : 0.45, transition: 'opacity 0.3s' }}>
+                <rect x="1" y="1" width={COURT_W_M * MAP_SCALE - 2} height={COURT_L_M * MAP_SCALE - 2} fill="none" stroke={colors.sand} strokeWidth="2" />
+                <line x1="0" y1={COURT_L_M * MAP_SCALE / 2} x2={COURT_W_M * MAP_SCALE} y2={COURT_L_M * MAP_SCALE / 2} stroke={colors.textDim} strokeWidth="2" />
+                {REAL_PLAYERS_COURT.map((p, i) => (
+                  <circle key={i} cx={p[0] * MAP_SCALE} cy={p[1] * MAP_SCALE} r="6" fill={i < 2 ? colors.teal : colors.coral} stroke={colors.bg} strokeWidth="1.2" />
+                ))}
+              </svg>
+              {!done3 && (
+                <p style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '6px' }}>Si completa clic dopo clic.</p>
+              )}
+            </div>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '14px' }}>
             <GhostButton onClick={reset}>Ricomincia</GhostButton>
           </div>
-          {H && (
-            <Box type="tip" title="Perché funziona con 4 soli punti">
-              Bastano pochi secondi di aiuto umano, una volta sola: da quei 4 angoli il sistema ricava la trasformazione dell'intero campo, angoli fuori inquadratura compresi.
+          {done3 && (
+            <Box type="tip" title="Perché bastano 4 punti">
+              Pochi secondi di aiuto umano, una volta sola: da quei punti il sistema ricava la trasformazione (<strong style={{ color: colors.text }}>omografia</strong>) dell'intero campo, angoli fuori inquadratura compresi.
             </Box>
           )}
         </div>
@@ -301,12 +320,13 @@
     }
 
     /* ============================================================
-       SIMULATORE 2 — "L'ombra della palla"
+       SIMULATORE 2 — "L'ombra della palla" (stessa geometria reale)
        ============================================================ */
 
-    const SHADOW_H = solveHomography(COURT_IMG_CORNERS, COURT_DEST_M);
-    const BALL_GROUND_PX = { x: 400, y: 250 };
-    const RISE_PER_METER = 55; // px di risalita nell'immagine per ogni metro di altezza reale
+    const SHADOW_H = solveHomography(REAL_CORNERS_PX, COURT_DEST_M);
+    const BALL_GROUND_PX = { x: 552, y: 548 }; // un punto a terra, dentro il quadrilatero reale del campo
+    const RISE_PER_METER = 60; // px di risalita nell'immagine per ogni metro di altezza reale
+    const SHADOW_MAP_SCALE = 13, SHADOW_W_M = 8, SHADOW_L_M = 16;
 
     function ShadowSimulator() {
       const [height, setHeight] = useState(0);
@@ -315,16 +335,17 @@
       const apparentMapped = applyHomography(SHADOW_H, apparentImg.x, apparentImg.y);
       const dist = Math.hypot(apparentMapped.x - trueMapped.x, apparentMapped.y - trueMapped.y);
 
-      const W = 16 * MAP_SCALE, Hh = 8 * MAP_SCALE;
-      const pad = 110;
-      const clampedShadow = { x: apparentMapped.x * MAP_SCALE, y: apparentMapped.y * MAP_SCALE };
+      const W = SHADOW_W_M * SHADOW_MAP_SCALE, Hh = SHADOW_L_M * SHADOW_MAP_SCALE;
+      const pad = 160;
+      const trueXY = { x: trueMapped.x * SHADOW_MAP_SCALE, y: trueMapped.y * SHADOW_MAP_SCALE };
+      const appXY = { x: apparentMapped.x * SHADOW_MAP_SCALE, y: apparentMapped.y * SHADOW_MAP_SCALE };
       const sev = dist < 1 ? colors.teal : dist < 4 ? colors.warn : colors.danger;
 
       return (
         <div>
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ flex: '1 1 220px' }}>
-              <svg viewBox="0 0 200 220" style={{ width: '100%', maxHeight: '30dvh', background: colors.bgLight, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <svg viewBox="0 0 200 220" style={{ width: '100%', maxHeight: '28dvh', background: colors.bgLight, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                 <line x1="30" y1="190" x2="170" y2="190" stroke={colors.textMuted} strokeWidth="3" />
                 {[0, 1, 2, 3].map(m => (
                   <g key={m}>
@@ -337,13 +358,13 @@
               </svg>
               <p style={{ textAlign: 'center', color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '4px' }}>Altezza reale della palla</p>
             </div>
-            <div style={{ flex: '1 1 260px' }}>
-              <svg viewBox={`${-pad} ${-pad} ${W + pad * 2} ${Hh + pad * 2}`} style={{ width: '100%', maxHeight: '30dvh', background: '#0b2f3a', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+            <div style={{ flex: '1 1 240px' }}>
+              <svg viewBox={`${-pad} ${-pad / 2} ${W + pad * 2} ${Hh + pad}`} style={{ width: '100%', maxHeight: '28dvh', background: '#0b2f3a', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                 <rect x="1" y="1" width={W - 2} height={Hh - 2} fill="none" stroke={colors.sand} strokeWidth="2" />
-                <line x1={W / 2} y1="0" x2={W / 2} y2={Hh} stroke={colors.textDim} strokeWidth="2" />
-                <line x1={trueMapped.x * MAP_SCALE} y1={trueMapped.y * MAP_SCALE} x2={clampedShadow.x} y2={clampedShadow.y} stroke={sev} strokeWidth="2" strokeDasharray="5 4" />
-                <circle cx={trueMapped.x * MAP_SCALE} cy={trueMapped.y * MAP_SCALE} r="8" fill={colors.sun} stroke={colors.bg} strokeWidth="1.5" />
-                <circle cx={clampedShadow.x} cy={clampedShadow.y} r="8" fill={sev} stroke={colors.bg} strokeWidth="1.5" />
+                <line x1="0" y1={Hh / 2} x2={W} y2={Hh / 2} stroke={colors.textDim} strokeWidth="2" />
+                <line x1={trueXY.x} y1={trueXY.y} x2={appXY.x} y2={appXY.y} stroke={sev} strokeWidth="2" strokeDasharray="5 4" />
+                <circle cx={trueXY.x} cy={trueXY.y} r="7" fill={colors.sun} stroke={colors.bg} strokeWidth="1.5" />
+                <circle cx={appXY.x} cy={appXY.y} r="7" fill={sev} stroke={colors.bg} strokeWidth="1.5" />
               </svg>
               <p style={{ textAlign: 'center', color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '4px' }}>
                 <span style={{ color: colors.sun }}>●</span> posizione vera al suolo &nbsp; <span style={{ color: sev }}>●</span> dove il sistema "pensa" che sia
@@ -362,232 +383,123 @@
     }
 
     /* ============================================================
-       SIMULATORE 3 — "Segui il giocatore"
+       SLIDE 5 — "Chi è chi": ritaglio reale delle due compagne
        ============================================================ */
 
-    const CHASE_PLAYERS = [
-      { id: 0, pts: [[100, 80], [300, 220], [500, 80], [620, 180]] },
-      { id: 1, pts: [[620, 80], [400, 220], [200, 80], [80, 180]] },
-      { id: 2, pts: [[100, 220], [300, 80], [500, 220], [620, 80]] },
-      { id: 3, pts: [[620, 220], [400, 80], [200, 220], [80, 80]] }
-    ];
-    const CHASE_DURATION = 6; // secondi
-    const CHASE_HIGHLIGHT_UNTIL = 1.4; // secondi
+    // Finestra di ritaglio attorno a players[0] e players[1] di court.json (unione dei due
+    // box + margine), stessa logica di "zoom_window" usata nel manifest per i fotogrammi
+    // dei gesti: locale = (assoluto - finestra_origine) / finestra_dimensione.
+    const TEAM_CROP_WINDOW = [0.24, 0.49, 0.22, 0.40]; // [x0, y0, w, h] normalizzati
 
-    function chasePositionAt(pts, frac) {
-      const fracs = [0, 0.33, 0.66, 1];
-      for (let i = 0; i < 3; i++) {
-        if (frac >= fracs[i] && frac <= fracs[i + 1]) {
-          const lt = (frac - fracs[i]) / (fracs[i + 1] - fracs[i]);
-          const a = pts[i], b = pts[i + 1];
-          return { x: a[0] + (b[0] - a[0]) * lt, y: a[1] + (b[1] - a[1]) * lt };
-        }
-      }
-      return { x: pts[3][0], y: pts[3][1] };
+    function remapBox(box, win) {
+      const [x0, y0, w, h] = win;
+      const [bx1, by1, bx2, by2] = box;
+      return { left: (bx1 - x0) / w, top: (by1 - y0) / h, width: (bx2 - bx1) / w, height: (by2 - by1) / h };
     }
 
-    function ChaseSimulator() {
-      const [phase, setPhase] = useState('idle'); // idle | running | guessing | done
-      const [simT, setSimT] = useState(0);
-      const [guess, setGuess] = useState(null);
-      const rafRef = useRef(null);
-      const startRef = useRef(null);
-
-      const start = useCallback(() => {
-        cancelAnimationFrame(rafRef.current);
-        setGuess(null);
-        setPhase('running');
-        simActive = true;
-        startRef.current = performance.now();
-        const tick = (now) => {
-          const elapsed = (now - startRef.current) / 1000;
-          setSimT(elapsed);
-          if (elapsed >= CHASE_DURATION) {
-            setSimT(CHASE_DURATION);
-            setPhase('guessing');
-            return;
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        };
-        rafRef.current = requestAnimationFrame(tick);
-      }, []);
-
-      useEffect(() => () => { cancelAnimationFrame(rafRef.current); simActive = false; }, []);
-
-      const frac = Math.min(1, simT / CHASE_DURATION);
-      const showHighlight = phase === 'running' && simT < CHASE_HIGHLIGHT_UNTIL;
-      const positions = CHASE_PLAYERS.map(p => ({ id: p.id, ...chasePositionAt(p.pts, frac) }));
-
-      const onGuess = (id) => {
-        if (phase !== 'guessing') return;
-        setGuess(id);
-        setPhase('done');
-        simActive = false;
-      };
-      const reset = () => { setPhase('idle'); setSimT(0); setGuess(null); simActive = false; };
-
+    function TeammatesCompare() {
+      const [x0, y0, w, h] = TEAM_CROP_WINDOW;
+      const boxes = [remapBox(REAL_PLAYERS_NORM[0], TEAM_CROP_WINDOW), remapBox(REAL_PLAYERS_NORM[1], TEAM_CROP_WINDOW)];
       return (
-        <div>
-          <svg viewBox="0 0 700 300" style={{ width: '100%', maxHeight: '38dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <rect x="20" y="20" width="660" height="260" fill="none" stroke={colors.border} strokeWidth="1" />
-            {positions.map(p => {
-              const highlighted = showHighlight && p.id === 0;
-              const clickable = phase === 'guessing';
-              return (
-                <g key={p.id} onClick={() => clickable && onGuess(p.id)} style={{ cursor: clickable ? 'pointer' : 'default' }}>
-                  <circle cx={p.x} cy={p.y} r="26" fill="transparent" />
-                  <circle cx={p.x} cy={p.y} r={highlighted ? 16 : 13} fill={highlighted ? colors.sun : colors.teal}
-                    stroke={phase === 'done' && p.id === 0 ? colors.sun : colors.bg} strokeWidth={phase === 'done' && p.id === 0 ? 3 : 1.5} />
-                  {highlighted && <text x={p.x} y={p.y - 24} textAnchor="middle" fontSize="13" fontWeight="700" fill={colors.sun}>Segui questo!</text>}
-                  {phase === 'done' && guess === p.id && (
-                    <text x={p.x} y={p.y - 24} textAnchor="middle" fontSize="20">{p.id === 0 ? '✓' : '✗'}</text>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '14px', flexWrap: 'wrap' }}>
-            {phase === 'idle' && <SolidButton onClick={start}>Avvia</SolidButton>}
-            {phase === 'running' && <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', alignSelf: 'center' }}>Segui con lo sguardo il pallino evidenziato…</p>}
-            {phase === 'guessing' && <p style={{ color: colors.text, fontWeight: '700', fontSize: 'var(--fs-sm)', alignSelf: 'center' }}>Ora clicca sul pallino che era quello evidenziato all'inizio.</p>}
-            {phase === 'done' && <>
-              <SolidButton onClick={start}>Rigioca</SolidButton>
-              <GhostButton onClick={reset}>Ricomincia da capo</GhostButton>
-            </>}
-          </div>
-          {phase === 'done' && (
-            <Box type={guess === 0 ? 'success' : 'warn'} title={guess === 0 ? 'Esatto!' : 'Non proprio'}>
-              {guess === 0
-                ? 'Hai seguito bene il movimento. Ma con quattro divise identiche, un solo incrocio in più e l\'avresti perso.'
-                : 'Il pallino giusto è quello segnato con ✓. Riconoscerlo solo dall\'aspetto, con la stessa divisa per tutti, è quasi impossibile.'}
-              <br /><strong style={{ color: colors.text }}>La posizione e la continuità del movimento funzionano meglio dell'aspetto.</strong>
-            </Box>
-          )}
-        </div>
-      );
-    }
-
-    /* ============================================================
-       SIMULATORE 4 — "Costruisci lo scambio"
-       ============================================================ */
-
-    const RALLY_EVENTS = [
-      { t: 3, type: 'SERVE', position: 'fondo' },
-      { t: 9, type: 'BUMP' },
-      { t: 15, type: 'SET' },
-      { t: 20, type: 'SPIKE' },
-      { t: 24, type: 'SERVE', position: 'centro', noise: true },
-      { t: 30, type: 'STOP' },
-      { t: 36, type: 'BUMP', noise: true },
-      { t: 44, type: 'SERVE', position: 'centro', noise: true },
-      { t: 54, type: 'SERVE', position: 'fondo' },
-      { t: 60, type: 'BUMP' },
-      { t: 66, type: 'SPIKE' },
-      { t: 70, type: 'STOP' },
-      { t: 78, type: 'SERVE', position: 'centro', noise: true },
-      { t: 85, type: 'BUMP', noise: true }
-    ];
-    const EVENT_LABELS = { SERVE: 'Battuta', BUMP: 'Bagher', SET: 'Alzata', SPIKE: 'Schiacciata', STOP: 'Palla ferma' };
-    const EVENT_COLORS = { SERVE: colors.sun, BUMP: colors.info, SET: colors.purple, SPIKE: colors.coral, STOP: colors.textMuted };
-
-    function computeRallySpans(events) {
-      const starts = events.filter(e => e.type === 'SERVE' && e.position === 'fondo').map(e => e.t);
-      const stops = events.filter(e => e.type === 'STOP').map(e => e.t);
-      return starts.map(s => {
-        const stop = stops.find(st => st > s);
-        return stop != null ? [s, stop] : null;
-      }).filter(Boolean);
-    }
-
-    function TimelineSimulator() {
-      const [rule1, setRule1] = useState(false);
-      const [rule2, setRule2] = useState(false);
-      const spans = computeRallySpans(RALLY_EVENTS);
-
-      const isDiscarded = (e) => {
-        if (e.type === 'STOP') return false;
-        if (rule1 && e.type === 'SERVE' && e.position === 'centro') return true;
-        if (rule2 && !spans.some(([s, en]) => e.t >= s && e.t <= en)) return true;
-        return false;
-      };
-
-      const X = t => 40 + (t / 100) * 920;
-      const totalServe = RALLY_EVENTS.filter(e => e.type === 'SERVE').length;
-      const validServe = RALLY_EVENTS.filter(e => e.type === 'SERVE' && e.position === 'fondo').length;
-      const deadTimeEvents = RALLY_EVENTS.filter(e => e.type !== 'STOP' && !spans.some(([s, en]) => e.t >= s && e.t <= en));
-
-      return (
-        <div>
-          <svg viewBox="0 0 1000 170" style={{ width: '100%', maxHeight: '32dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <line x1="40" y1="90" x2="960" y2="90" stroke={colors.border} strokeWidth="2" />
-            {rule2 && spans.map(([s, en], i) => (
-              <rect key={i} x={X(s) - 8} y="30" width={X(en) - X(s) + 16} height="120" fill={colors.teal} opacity="0.12" rx="6" />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '8px', border: `1px solid ${colors.border}`, width: '100%', maxWidth: '340px', margin: '0 auto', aspectRatio: `${w * FRAME_W} / ${h * FRAME_H}` }}>
+            <img src="assets/frames/frame_court.jpg" alt="Due compagne di squadra sul campo, stessa divisa" draggable="false"
+              style={{ position: 'absolute', left: `${-(x0 / w) * 100}%`, top: `${-(y0 / h) * 100}%`, width: `${100 / w}%`, height: `${100 / h}%`, maxWidth: 'none' }} />
+            {boxes.map((b, i) => (
+              <div key={i} style={{ position: 'absolute', left: `${b.left * 100}%`, top: `${b.top * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%`, border: `2px solid ${colors.sun}`, borderRadius: '3px' }} />
             ))}
-            {RALLY_EVENTS.map((e, i) => {
-              const discarded = isDiscarded(e);
-              const x = X(e.t);
-              if (e.type === 'STOP') {
-                return (
-                  <g key={i}>
-                    <line x1={x} y1="70" x2={x} y2="110" stroke={colors.textMuted} strokeWidth="2" strokeDasharray="4 3" />
-                    <text x={x} y="128" textAnchor="middle" fontSize="10" fill={colors.textMuted}>palla ferma</text>
-                  </g>
-                );
-              }
-              return (
-                <g key={i} opacity={discarded ? 0.3 : 1}>
-                  <circle cx={x} cy="90" r="11" fill={discarded ? colors.textMuted : EVENT_COLORS[e.type]} stroke={colors.bg} strokeWidth="1.5" />
-                  {discarded && <text x={x} y="94" textAnchor="middle" fontSize="12" fontWeight="700" fill={colors.bg}>×</text>}
-                  <text x={x} y="66" textAnchor="middle" fontSize="10" fill={discarded ? colors.textMuted : colors.textDim}>{EVENT_LABELS[e.type]}</text>
-                  {e.type === 'SERVE' && <text x={x} y="118" textAnchor="middle" fontSize="9" fill={colors.textMuted}>{e.position}</text>}
-                </g>
-              );
-            })}
-          </svg>
-          <div className="rule-row" style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
-            <GhostButton active={rule1} onClick={() => setRule1(r => !r)}>Regola 1 — battuta solo da fondo campo</GhostButton>
-            <GhostButton active={rule2} onClick={() => setRule2(r => !r)}>Regola 2 — scambio: da battuta a palla ferma</GhostButton>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '10px', marginTop: '14px' }}>
-            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '10px 14px' }}>
-              <strong style={{ color: colors.text }}>{rule1 ? validServe : totalServe}</strong>
-              <span style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)' }}> / {totalServe} battute considerate valide</span>
-            </div>
-            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '10px 14px' }}>
-              <strong style={{ color: colors.text }}>{rule2 ? deadTimeEvents.length : 0}</strong>
-              <span style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)' }}> eventi nel tempo morto scartati</span>
-            </div>
-          </div>
-          {rule1 && rule2 && (
-            <Box type="success" title="La timeline si è ricomposta">
-              Con entrambe le regole attive restano solo due blocchi puliti: due scambi veri, con la loro battuta e i loro tocchi.
-            </Box>
-          )}
+          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '6px' }}>Due compagne di squadra: stessa divisa, stesso aspetto da lontano.</p>
         </div>
       );
     }
 
     /* ============================================================
-       SLIDE 2 — illustrazione a domino
+       SLIDE 6 — "La grammatica dello scambio": timeline reale
+       ============================================================ */
+
+    const TIMELINE_FPS = 30, TIMELINE_FRAMES = 5400; // timeline.json → fps, frames (3 minuti reali)
+    const TIMELINE_RALLIES = [[80, 197], [587, 974], [1571, 1775], [2258, 2372], [3146, 3410], [3860, 4022], [4400, 4601], [5171, 5318]]; // timeline.json → rallies
+    const TIMELINE_TOUCHES = [ // timeline.json → touches
+      { f: 116, g: null }, { f: 137, g: null }, { f: 146, g: 'BUMP' }, { f: 602, g: null }, { f: 611, g: null },
+      { f: 635, g: null }, { f: 728, g: null }, { f: 743, g: null }, { f: 752, g: null }, { f: 764, g: null },
+      { f: 863, g: null }, { f: 896, g: null }, { f: 1745, g: 'BUMP' }, { f: 3191, g: null }, { f: 3209, g: 'BUMP' },
+      { f: 3251, g: 'SET' }, { f: 3329, g: null }, { f: 3362, g: null }, { f: 5219, g: null }, { f: 5276, g: null }
+    ];
+    const TOUCH_COLOR = { null: colors.textMuted, BUMP: colors.info, SET: colors.purple };
+
+    function RealTimelineChart() {
+      const PAD_L = 40, PAD_R = 20, W = 900;
+      const X = f => PAD_L + (f / TIMELINE_FRAMES) * W;
+      const timeLabel = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      return (
+        <div>
+          <svg viewBox={`0 0 ${PAD_L + W + PAD_R} 130`} style={{ width: '100%', maxHeight: '26dvh', background: colors.bg, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+            <line x1={PAD_L} y1="70" x2={PAD_L + W} y2="70" stroke={colors.border} strokeWidth="2" />
+            {[0, 60, 120, 180].map(s => (
+              <g key={s}>
+                <line x1={X(s * TIMELINE_FPS)} y1="64" x2={X(s * TIMELINE_FPS)} y2="76" stroke={colors.border} strokeWidth="1" />
+                <text x={X(s * TIMELINE_FPS)} y="98" textAnchor="middle" fontSize="11" fill={colors.textMuted}>{timeLabel(s)}</text>
+              </g>
+            ))}
+            {TIMELINE_RALLIES.map(([s, e], i) => (
+              <rect key={i} x={X(s)} y="40" width={Math.max(2, X(e) - X(s))} height="60" fill={colors.teal} opacity="0.35" rx="3" />
+            ))}
+            {TIMELINE_TOUCHES.map((t, i) => (
+              <line key={i} x1={X(t.f)} y1="34" x2={X(t.f)} y2="80" stroke={TOUCH_COLOR[t.g]} strokeWidth="3" />
+            ))}
+          </svg>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '8px', fontSize: 'var(--fs-xs)', color: colors.textMuted }}>
+            <span><span style={{ color: colors.teal }}>▬</span> scambio rilevato</span>
+            <span><span style={{ color: colors.info }}>┃</span> bagher</span>
+            <span><span style={{ color: colors.purple }}>┃</span> alzata</span>
+            <span><span style={{ color: colors.textMuted }}>┃</span> tocco da verificare</span>
+          </div>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       SLIDE 2 — illustrazione a domino (compatta)
        ============================================================ */
 
     function CascadeIllustration() {
       const steps = [
-        { icon: '📷', label: 'Niente linee di campo trovate' },
+        { icon: '📷', label: 'Niente linee trovate' },
         { icon: '🗺️', label: 'Sparisce la vista dall\'alto' },
-        { icon: '🔁', label: 'Scambi contati ×4 il reale' },
+        { icon: '🔁', label: 'Scambi ×4 il reale' },
         { icon: '📈', label: 'Punteggio gonfiato' }
       ];
       return (
-        <div className="domino-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', alignItems: 'stretch', margin: '20px 0' }}>
+        <div className="domino-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', alignItems: 'stretch', margin: '16px 0' }}>
           {steps.map((s, i) => (
-            <React.Fragment key={i}>
-              <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '16px 10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '32px', marginBottom: '8px' }}>{s.icon}</div>
-                <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', fontWeight: '600' }}>{s.label}</div>
-              </div>
-            </React.Fragment>
+            <div key={i} style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '12px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '26px', marginBottom: '6px' }}>{s.icon}</div>
+              <div style={{ color: colors.textDim, fontSize: 'var(--fs-xs)', fontWeight: '600' }}>{s.label}</div>
+            </div>
           ))}
+        </div>
+      );
+    }
+
+    function CourtCompare() {
+      return (
+        <div className="court-compare" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', margin: '16px 0' }}>
+          <div>
+            <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, width: '100%', borderRadius: '8px', overflow: 'hidden', border: `2px solid ${colors.danger}` }}>
+              <img src="assets/frames/frame_court.jpg" alt="Fotogramma reale senza linee di campo rilevate" style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '26dvh', objectFit: 'cover' }} />
+            </div>
+            <p style={{ textAlign: 'center', color: colors.danger, fontSize: 'var(--fs-sm)', fontWeight: '700', marginTop: '6px' }}>Quello che il modello vedeva</p>
+          </div>
+          <div>
+            <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, width: '100%', borderRadius: '8px', overflow: 'hidden', border: `2px solid ${colors.teal}` }}>
+              <img src="assets/frames/frame_court.jpg" alt="Stesso fotogramma con il quadrilatero del campo ricostruito" style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '26dvh', objectFit: 'cover' }} />
+              <svg viewBox={`0 0 ${FRAME_W} ${FRAME_H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                <polygon points={REAL_CORNERS_PX.map(p => `${p.x},${p.y}`).join(' ')} fill={colors.sun} fillOpacity="0.18" stroke={colors.sun} strokeWidth="4" />
+              </svg>
+            </div>
+            <p style={{ textAlign: 'center', color: colors.teal, fontSize: 'var(--fs-sm)', fontWeight: '700', marginTop: '6px' }}>Il campo (dati reali)</p>
+          </div>
         </div>
       );
     }
@@ -609,23 +521,19 @@
         </div>
       ),
 
-      // 2 - La partita A: il campo che non si vede
+      // 2 - La partita A: il campo che il modello non vede
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🏖️</span> La partita A: il campo che non si vede
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🏖️</span> Partita A: il campo che il modello non vede
           </h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Una partita intera ripresa da un treppiede. Il modello che riconosce il campo, addestrato su riprese televisive, <strong style={{ color: colors.text }}>non trova le linee.</strong>
-            </p>
-          </Glow>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '14px' }}>
-            Un solo errore a monte si moltiplica a valle, come una fila di tessere del domino:
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
+            Una partita intera ripresa da un treppiede. Il modello che riconosce il campo, addestrato su riprese televisive, <strong style={{ color: colors.text }}>non trova le linee.</strong>
           </p>
+          <CourtCompare />
           <CascadeIllustration />
           <Box type="warn" title="Eppure...">
-            I gesti erano giusti. Non era un problema di battute, bagher o schiacciate: era un problema di geometria.
+            I gesti erano giusti. Non era un problema di battute o schiacciate: era un problema di geometria.
           </Box>
         </div>
       ),
@@ -636,18 +544,18 @@
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🗺️</span> Simulatore — Dalla foto alla mappa
           </h2>
-          <HomographySimulator />
+          <RealCourtSimulator />
         </div>
       ),
 
       // 4 - L'ombra della palla
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🌗</span> L'ombra della palla
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            C'è una trappola: la proiezione vista nella slide precedente vale solo per ciò che sta sul pavimento. Prova a sollevare la palla da terra.
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '10px' }}>
+            Trappola: la proiezione vista prima vale solo per ciò che sta sul pavimento. Prova a sollevare la palla da terra.
           </p>
           <ShadowSimulator />
         </div>
@@ -656,101 +564,66 @@
       // 5 - Chi è chi
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>👥</span> Chi è chi
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-            Volevamo riconoscere i 4 giocatori per tutta la partita con una rete specializzata nel riconoscere le persone dall'aspetto, addestrata sui pedoni per strada.
+          <TeammatesCompare />
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '14px' }}>
+            Una rete di re-identificazione (addestrata sui pedoni) doveva seguire i 4 giocatori per tutta la partita: <strong style={{ color: colors.text }}>fallimento netto</strong>, compagni con la stessa divisa si somigliano tutti.
           </p>
-          <Box type="danger" title="Fallimento netto">
-            I compagni di squadra indossano la stessa divisa e, in costume da bagno, si somigliano tutti. L'aspetto da solo non basta a distinguerli.
-          </Box>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
+            Posizione e movimento, invece, <strong style={{ color: colors.text }}>funzionano</strong>. E una regola del gioco aiuta: lo stesso giocatore non tocca due volte di fila, <strong style={{ color: colors.text }}>salvo dopo un muro.</strong>
+          </p>
         </div>
       ),
 
-      // 6 - Simulatore "Segui il giocatore"
+      // 6 - La grammatica dello scambio
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🎯</span> Simulatore — Segui il giocatore
-          </h2>
-          <ChaseSimulator />
-        </div>
-      ),
-
-      // 7 - Una regola del gioco al posto dell'algoritmo
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📏</span> Una regola del gioco al posto dell'algoritmo
-          </h2>
-          <Glow>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              "Lo stesso giocatore non può toccare due volte di fila, salvo dopo un muro": questa semplice regola del volley elimina quasi del tutto i doppi tocchi sbagliati.
-            </p>
-          </Glow>
-          <Box type="tip" title="Anche un fallimento è conoscenza">
-            La rete di riconoscimento persone non ha funzionato. Ma documentare bene perché non ha funzionato — e cosa ha funzionato al suo posto — vale quanto un risultato positivo.
-          </Box>
-        </div>
-      ),
-
-      // 8 - La grammatica dello scambio
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>📖</span> La grammatica dello scambio
           </h2>
-          <Box type="warn" title="Circa metà delle 'battute' era impossibile">
-            Circa metà delle battute rilevate erano a centro campo: impossibile, si batte sempre da fondo campo.
-          </Box>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '10px' }}>
-            Nuova definizione, presa in prestito dal regolamento vero: <strong style={{ color: colors.text }}>uno scambio inizia con la battuta e finisce quando la palla smette di volare.</strong>
-          </p>
-          <Box type="success" title="Risultato">
-            Numero di scambi corretto, tocchi fantasma nei tempi morti dimezzati.
-          </Box>
-          <Box type="tip" title="Un limite onesto">
-            Una regola sicura ma parziale serve a <strong style={{ color: colors.text }}>segnalare</strong> un errore, non a correggerlo alla cieca.
-          </Box>
+          <RealTimelineChart />
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginTop: '14px' }}>Metà delle battute rilevate era a centro campo: impossibile.</p>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>Nuova regola: <strong style={{ color: colors.text }}>uno scambio va dalla battuta a quando la palla smette di volare.</strong></p>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>Risultato, sui 3 minuti reali qui sopra: numero di scambi corretto, tocchi fantasma dimezzati.</p>
         </div>
       ),
 
-      // 9 - Simulatore "Costruisci lo scambio"
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🧩</span> Simulatore — Costruisci lo scambio
-          </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            Questa è la sequenza grezza rilevata dal sistema, piena di rumore. Attiva le due regole, una alla volta, e guarda la timeline ricomporsi.
-          </p>
-          <TimelineSimulator />
-        </div>
-      ),
-
-      // 10 - Trovare la palla (e leggere il tabellone)
+      // 7 - Trovare la palla, leggere il tabellone
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🔍</span> Trovare la palla (e leggere il tabellone)
+            <span style={{ fontSize: '28px' }}>🔍</span> Trovare la palla, leggere il tabellone
           </h2>
           <Box type="danger" title="Scartato">
-            Abbiamo provato un grande modello "che riconosce tutto": ha messo il rettangolo della palla sul seggiolone dell'arbitro. Accorgimenti semplici sul tracciamento della palla hanno funzionato meglio.
+            Un grande modello "che riconosce tutto" ha messo il rettangolo della palla sul seggiolone dell'arbitro. Accorgimenti semplici sul tracciamento hanno funzionato meglio.
           </Box>
           <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '10px' }}>
             E il punteggio? <strong style={{ color: colors.text }}>C'è già scritto sul tabellone in sovrimpressione:</strong> si legge, invece di indovinarlo.
           </p>
           <Box type="tip" title="Il più grande o il più di moda non è automaticamente il migliore">
-            Un modello enorme e generico ha fatto peggio di scelte semplici, mirate al problema vero. Ed è proprio in questa fase che nasce il nome <strong style={{ color: colors.text }}>Vollytics</strong> (volley + analytics).
+            Un modello enorme e generico ha fatto peggio di scelte semplici, mirate al problema vero. Ed è in questa fase che nasce il nome <strong style={{ color: colors.text }}>Vollytics</strong> (volley + analytics).
           </Box>
         </div>
       ),
 
-      // 11 - Chiusura
+      // 8 - Chiusura
       () => (
         <div style={{ padding: '30px', textAlign: 'center' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Un sistema sempre più solido</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', maxWidth: '720px', margin: '0 auto 18px' }}>
+            {[
+              'Il campo si ricostruisce da 4 punti, anche dove l\'algoritmo generico non trova le linee.',
+              'L\'identità dei giocatori si segue per posizione e movimento, non per l\'aspetto.',
+              'La definizione giusta di "scambio" viene dal regolamento del gioco, non dai dati grezzi.'
+            ].map((l, i) => (
+              <div key={i} style={{ display: 'flex', gap: '10px', background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                <span style={{ color: colors.accent }}>✓</span>
+                <span style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>{l}</span>
+              </div>
+            ))}
+          </div>
           <Glow>
             <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)' }}>
               Poi è arrivato un video ripreso da un'angolazione mai vista. E tutto è crollato.
@@ -832,7 +705,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>

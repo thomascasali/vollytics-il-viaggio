@@ -59,6 +59,7 @@
     .draw-surface { touch-action: none; }
     .app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
+    .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     input[type=range] {
       -webkit-appearance: none; appearance: none;
       width: 100%; height: 36px; background: transparent; cursor: pointer; touch-action: none;
@@ -74,6 +75,7 @@
       border: 3px solid #0e1728; cursor: pointer;
     }
     input[type=range]:disabled { opacity: 1; cursor: not-allowed; }
+    .two-col-media { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -82,10 +84,12 @@
       .bottom-bar { gap: 8px !important; padding: 0 10px !important; }
       .bottom-bar button, .bottom-bar a { padding: 10px 14px !important; font-size: var(--fs-xs) !important; min-height: 44px; }
       svg { max-width: 100%; height: auto; }
-      .sliders-grid { grid-template-columns: 1fr !important; }
       .quadrant-grid { grid-template-columns: 1fr !important; }
       .report-cards { grid-template-columns: 1fr !important; }
       .pr-bars { flex-direction: column !important; }
+      .recap-grid { grid-template-columns: 1fr !important; }
+      .two-col-media { grid-template-columns: 1fr !important; }
+      .rule-cards { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -95,7 +99,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel" data-presets="classic">
-    const { useState, useEffect, useRef, useCallback, useMemo } = React;
+    const { useState, useEffect, useRef, useCallback } = React;
 
     /* ============================================================
        CONTRASTO — utility numerica (KB UI-CONTRAST-ACCESSIBILITY.md)
@@ -116,7 +120,7 @@
     const colors = {
       bg: '#0e1728', bgCard: '#16233c', bgLight: '#1E2E52',
       // Rosso #e0563a scurito di circa il 25% (come il coral in Atto 1): accentSolid
-      // #A8412C dà, con testo bianco, un contrasto verificato ≈6.1:1 (WCAG AA) — meglio
+      // #A8412C dà, con testo bianco, un contrasto verificato ≈6.07:1 (WCAG AA) — meglio
       // del ≈3.8:1 del rosso pieno originale con testo bianco, e meglio anche del ≈4.75:1
       // di testo scuro sul rosso NON scurito. Per questo qui accentSolid resta scurito e
       // SolidButton usa testo bianco (a differenza dell'Atto 2, dove l'accent chiaro
@@ -209,129 +213,68 @@
       >{children}</button>
     );
 
+    // RecapCard: usata nella slide di chiusura dell'atto per i 3 punti di recap.
+    const RecapCard = ({ n, children }) => (
+      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '16px', textAlign: 'left' }}>
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: '800', color: colors.accent, fontSize: 'var(--fs-h3)', marginBottom: '6px' }}>{n}</div>
+        <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', lineHeight: 'var(--lh-body)' }}>{children}</div>
+      </div>
+    );
+
+    // RuleCard: le 3 regole di buon senso della slide "Migliorare a occhio".
+    const RuleCard = ({ icon, children }) => (
+      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '18px', textAlign: 'center' }}>
+        <div style={{ fontSize: '26px', marginBottom: '8px' }}>{icon}</div>
+        <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>{children}</div>
+      </div>
+    );
+
     /* ============================================================
-       SIMULATORE 1 — "Il cursore magico"
-       Dataset sintetico illustrativo (non metriche reali del progetto): 12 azioni
-       vere con confidenza/distanza variabili (alcune volutamente "difficili": lontane
-       o a bassa confidenza, per mostrare che regole più severe le tagliano fuori), 8
-       azioni false ("rumore", es. pubblico) con confidenza/distanza che le fanno
-       sembrare plausibili nella fascia centrale delle soglie.
+       ILLUSTRAZIONE — "La doccia fredda": 3 passi + grafico relativo
        ============================================================ */
-    const MAGIC_TRUE = [
-      { conf: 88, dist: 10 }, { conf: 82, dist: 15 }, { conf: 75, dist: 20 }, { conf: 70, dist: 60 },
-      { conf: 65, dist: 25 }, { conf: 60, dist: 30 }, { conf: 55, dist: 70 }, { conf: 50, dist: 35 },
-      { conf: 45, dist: 40 }, { conf: 40, dist: 20 }, { conf: 35, dist: 15 }, { conf: 30, dist: 50 }
-    ].map((d, i) => ({ ...d, id: 't' + i, real: true }));
-    const MAGIC_FALSE = [
-      { conf: 78, dist: 25 }, { conf: 72, dist: 30 }, { conf: 68, dist: 20 }, { conf: 60, dist: 15 },
-      { conf: 55, dist: 45 }, { conf: 48, dist: 10 }, { conf: 42, dist: 55 }, { conf: 90, dist: 65 }
-    ].map((d, i) => ({ ...d, id: 'f' + i, real: false }));
-    const MAGIC_ALL = [...MAGIC_TRUE, ...MAGIC_FALSE];
-
-    function MagicSliderSim() {
-      const [soglia, setSoglia] = useState(20);
-      const [distanza, setDistanza] = useState(80);
-      const [revealed, setRevealed] = useState(false);
-
-      const kept = MAGIC_ALL.filter(a => a.conf >= soglia && a.dist <= distanza);
-      const tp = kept.filter(a => a.real).length;
-      const fp = kept.filter(a => !a.real).length;
-      const fn = MAGIC_TRUE.length - tp;
-
+    function StepRow() {
+      const steps = [
+        { icon: '📋', text: 'Clip etichettate a mano (ground truth)' },
+        { icon: '🔧', text: 'Togli una regola alla volta' },
+        { icon: '⚖️', text: 'Confronta' }
+      ];
       return (
-        <div>
-          <div className="sliders-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '18px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-sm)', color: colors.textDim, marginBottom: '6px' }}>
-                <span>Soglia palla (sicurezza minima)</span><strong>{soglia}</strong>
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '22px' }}>
+          {steps.map((s, i) => (
+            <React.Fragment key={i}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: colors.bgCard, border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{s.icon}</div>
+                <span style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>{s.text}</span>
               </div>
-              <input type="range" min="0" max="100" value={soglia} style={{ '--thumb': colors.accent }}
-                onChange={e => { setSoglia(Number(e.target.value)); setRevealed(false); }} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-sm)', color: colors.textDim, marginBottom: '6px' }}>
-                <span>Distanza massima palla–giocatore</span><strong>{distanza}</strong>
-              </div>
-              <input type="range" min="0" max="100" value={distanza} style={{ '--thumb': colors.accent }}
-                onChange={e => { setDistanza(Number(e.target.value)); setRevealed(false); }} />
-            </div>
-          </div>
+              {i < steps.length - 1 && <span style={{ color: colors.textMuted, alignSelf: 'center' }}>→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    }
 
-          <div style={{ textAlign: 'center', background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '10px', padding: '22px', marginBottom: '16px' }}>
-            <div style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginBottom: '6px' }}>Azioni rilevate</div>
-            <div style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: '800', fontSize: 'var(--fs-display)', color: colors.accentAlt, lineHeight: 1 }}>{kept.length}</div>
-            {!revealed && <div style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '8px' }}>Sembra un numero sempre più ragionevole...</div>}
-          </div>
-
-          {revealed && (
-            <Box type="danger" title="Confronto con la verità">
-              <div className="report-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ textAlign: 'center' }}><strong style={{ color: colors.success, fontSize: 'var(--fs-h3)' }}>{tp}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>vere trovate</div></div>
-                <div style={{ textAlign: 'center' }}><strong style={{ color: colors.danger, fontSize: 'var(--fs-h3)' }}>{fp}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>false incluse</div></div>
-                <div style={{ textAlign: 'center' }}><strong style={{ color: colors.warn, fontSize: 'var(--fs-h3)' }}>{fn}</strong><div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>vere perse</div></div>
-              </div>
-              <p>Il numero "{kept.length}" sembrava plausibile, ma dentro c'erano azioni false e mancavano azioni vere. Senza una verità di riferimento, non potevamo saperlo.</p>
-            </Box>
-          )}
-
-          <div style={{ textAlign: 'center', marginTop: '14px' }}>
-            <SolidButton onClick={() => setRevealed(true)} bg={colors.accentSolid}>Confronta con la verità</SolidButton>
-          </div>
+    // Barre RELATIVE (non metriche reali del progetto): asse senza numeri, solo per mostrare
+    // che "senza le regole" il risultato era circa dieci volte quello "con le regole" — vedi
+    // BRIEF_V2.md, slide "La doccia fredda". Nessun valore assoluto pubblicato.
+    function RelativeBarChart() {
+      const withRules = 10, withoutRules = 100, max = 112;
+      const barH = v => (v / max) * 150;
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <svg viewBox="0 0 320 210" style={{ width: '100%', maxWidth: '760px', height: 'auto', maxHeight: '48dvh' }}>
+            <text x="160" y="16" textAnchor="middle" fontSize="10" fill={colors.textMuted} fontStyle="italic">scala relativa (senza numeri)</text>
+            <line x1="30" y1="190" x2="300" y2="190" stroke={colors.border} strokeWidth="2" />
+            <rect x="75" y={190 - barH(withRules)} width="60" height={barH(withRules)} fill={colors.textMuted} rx="4" />
+            <text x="105" y="205" textAnchor="middle" fontSize="11" fill={colors.textDim}>con le regole</text>
+            <rect x="185" y={190 - barH(withoutRules)} width="60" height={barH(withoutRules)} fill={colors.accent} rx="4" />
+            <text x="215" y="205" textAnchor="middle" fontSize="11" fill={colors.textDim}>senza le regole</text>
+          </svg>
         </div>
       );
     }
 
     /* ============================================================
-       ILLUSTRAZIONE — Falsi positivi e falsi negativi (4 quadranti)
-       ============================================================ */
-    function QuadrantGrid() {
-      const Q = ({ title, kind, children }) => (
-        <div style={{
-          background: colors.bgCard, borderRadius: '8px', overflow: 'hidden',
-          border: `2px solid ${kind === 'ok' ? colors.success : colors.danger}`
-        }}>
-          <div style={{ padding: '8px 12px', fontWeight: '700', fontFamily: "'Montserrat', sans-serif", fontSize: 'var(--fs-sm)', color: kind === 'ok' ? colors.success : colors.danger, borderBottom: `1px solid ${colors.border}` }}>{title}</div>
-          <div style={{ padding: '12px' }}>{children}</div>
-        </div>
-      );
-      return (
-        <div className="quadrant-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          <Q title="Vero positivo" kind="ok">
-            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center' }}>
-              <img src="assets/frames/gesture_SPIKE_zoom_annot.jpg" alt="Schiacciata correttamente rilevata" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'inline-block' }} />
-            </div>
-            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>La schiacciata c'è, ed è segnata.</p>
-          </Q>
-          <Q title="Falso positivo" kind="bad">
-            <svg viewBox="0 0 160 100" style={{ width: '100%', maxHeight: '18dvh' }}>
-              <rect width="160" height="100" fill={colors.bg} />
-              <rect x="60" y="35" width="26" height="30" rx="4" fill={colors.textMuted} />
-              <rect x="55" y="30" width="36" height="40" fill="none" stroke={colors.danger} strokeWidth="2" strokeDasharray="4 3" />
-              <text x="58" y="26" fontSize="9" fill={colors.danger} fontFamily="Montserrat, sans-serif">"palla"?</text>
-            </svg>
-            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>Illustrazione: il sistema disegna il rettangolo "palla" sul seggiolone dell'arbitro.</p>
-          </Q>
-          <Q title="Falso negativo" kind="bad">
-            <svg viewBox="0 0 160 100" style={{ width: '100%', maxHeight: '18dvh' }}>
-              <rect width="160" height="100" fill={colors.bg} />
-              <circle cx="90" cy="30" r="6" fill={colors.sand} />
-              <rect x="55" y="35" width="16" height="45" rx="6" fill={colors.info} />
-              <text x="20" y="90" fontSize="9" fill={colors.danger} fontFamily="Montserrat, sans-serif">nessuna etichetta</text>
-            </svg>
-            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>Illustrazione: una schiacciata evidente, ma il sistema non segna nulla.</p>
-          </Q>
-          <Q title="Vero negativo" kind="ok">
-            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center' }}>
-              <img src="assets/frames/rally_bg.jpg" alt="Fotogramma d'inizio scambio, nessuna schiacciata in corso" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'inline-block' }} />
-            </div>
-            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>Nessuna schiacciata, nessun rettangolo: giusto così.</p>
-          </Q>
-        </div>
-      );
-    }
-
-    /* ============================================================
-       SIMULATORE 2 — "Precision contro recall"
+       SIMULATORE 1 — "Precision contro recall"
        20 azioni candidate con una confidenza fissa; 12 vere (verdi), 8 false (grigie).
        ============================================================ */
     const PR_POINTS = [
@@ -407,6 +350,60 @@
     }
 
     /* ============================================================
+       ILLUSTRAZIONE — Sbagliare in due modi (4 quadranti, materiale reale)
+       ============================================================ */
+    function QuadrantGrid() {
+      const Q = ({ title, kind, children }) => (
+        <div style={{
+          background: colors.bgCard, borderRadius: '8px', overflow: 'hidden',
+          border: `2px solid ${kind === 'ok' ? colors.success : colors.danger}`
+        }}>
+          <div style={{ padding: '8px 12px', fontWeight: '700', fontFamily: "'Montserrat', sans-serif", fontSize: 'var(--fs-sm)', color: kind === 'ok' ? colors.success : colors.danger, borderBottom: `1px solid ${colors.border}` }}>{title}</div>
+          <div style={{ padding: '12px' }}>{children}</div>
+        </div>
+      );
+      return (
+        <div className="quadrant-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <Q title="Vero positivo" kind="ok">
+            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center' }}>
+              <img src="assets/frames/gesture_SPIKE_zoom_annot.jpg" alt="Schiacciata correttamente rilevata" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'inline-block' }} />
+            </div>
+            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>La schiacciata c'è, ed è segnata.</p>
+          </Q>
+          <Q title="Falso positivo" kind="bad">
+            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center', position: 'relative', display: 'inline-block' }}>
+              <img src="assets/crops/fake_0.jpg" alt="Falso candidato palla" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'block' }} />
+              <span style={{ position: 'absolute', top: '4px', left: '4px', background: colors.bg + 'cc', color: colors.danger, fontSize: '11px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>"palla?"</span>
+            </div>
+            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>È il cappellino dell'arbitro.</p>
+          </Q>
+          <Q title="Falso negativo" kind="bad">
+            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center' }}>
+              <img src="assets/frames/seq_4_zoom.jpg" alt="Fotogramma del contatto reale, non segnalato" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'inline-block' }} />
+            </div>
+            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>Una schiacciata evidente, ma il sistema non segna nulla.</p>
+          </Q>
+          <Q title="Vero negativo" kind="ok">
+            <div style={{ background: colors.bg, borderRadius: '6px', textAlign: 'center' }}>
+              <img src="assets/frames/rally_bg.jpg" alt="Fotogramma d'inizio scambio, nessuna schiacciata in corso" style={{ maxWidth: '100%', maxHeight: '18dvh', objectFit: 'contain', borderRadius: '6px', display: 'inline-block' }} />
+            </div>
+            <p style={{ fontSize: 'var(--fs-xs)', color: colors.textMuted, marginTop: '6px' }}>Nessuna schiacciata, nessun rettangolo: giusto così.</p>
+          </Q>
+        </div>
+      );
+    }
+
+    /* ============================================================
+       ILLUSTRAZIONE — Due sorprese (due colonne)
+       ============================================================ */
+    const SurpriseCard = ({ title, children }) => (
+      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '18px', flex: '1 1 260px' }}>
+        <h3 style={{ color: colors.accent, fontSize: 'var(--fs-h3)', marginBottom: '10px' }}>{title}</h3>
+        <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>{children}</div>
+      </div>
+    );
+
+    /* ============================================================
        ILLUSTRAZIONE — Validazione vs test ("compito a casa" / "verifica in classe")
        ============================================================ */
     function ValidationTestCards() {
@@ -430,7 +427,7 @@
     }
 
     /* ============================================================
-       SLIDES
+       SLIDES (8)
        ============================================================ */
     const slides = [
       // 1 - Titolo
@@ -447,63 +444,44 @@
 
       // 2 - Migliorare a occhio
       () => (
-        <div style={{ padding: '30px' }}>
+        <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>👀</span> Migliorare a occhio
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            Senza dati di confronto abbiamo aggiunto regole di buon senso:
-          </p>
-          <ul style={{ color: colors.textDim, lineHeight: '2.1', paddingLeft: '20px', fontSize: 'var(--fs-body)' }}>
-            <li>soglie più basse, per vedere più palle;</li>
-            <li>"un'azione vale solo se la palla è vicina al giocatore";</li>
-            <li>ignorare il pubblico fuori dal campo.</li>
-          </ul>
-          <Box type="warn" title="Sembrava funzionare">
-            I conteggi sembravano molto più sensati. Nella prossima slide proviamo lo stesso trucco.
-          </Box>
+          <div className="rule-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+            <RuleCard icon="🎚️">Soglie più basse, per vedere più palle</RuleCard>
+            <RuleCard icon="📏">Un'azione vale solo se la palla è vicina al giocatore</RuleCard>
+            <RuleCard icon="🙈">Ignorare il pubblico fuori dal campo</RuleCard>
+          </div>
+          <p style={{ textAlign: 'center', color: colors.textMuted, fontSize: 'var(--fs-sm)' }}>I conteggi sembravano molto più sensati.</p>
         </div>
       ),
 
-      // 3 - Simulatore "Il cursore magico"
+      // 3 - La doccia fredda
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🎚️</span> Simulatore — Il cursore magico
-          </h2>
-          <p style={{ color: colors.textMuted, fontSize: 'var(--fs-sm)', marginBottom: '14px' }}>Muovi i due cursori: il numero di azioni rilevate sembra migliorare. Poi confronta con la verità.</p>
-          <MagicSliderSim />
-        </div>
-      ),
-
-      // 4 - La doccia fredda
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>🥶</span> La doccia fredda
           </h2>
-          <Glow color={colors.accent}>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Abbiamo preso delle clip <strong style={{ color: colors.text }}>etichettate a mano</strong> (la verità di riferimento, o <em>ground truth</em>) e confrontato. Tolta una regola alla volta, le regole "intelligenti" <strong style={{ color: colors.text }}>distruggevano quasi tutto</strong> ciò che il modello vedeva bene.
-            </p>
-          </Glow>
-          <Box type="danger" title="Il conto">
-            Senza quelle regole, il risultato era <strong style={{ color: colors.text }}>circa dieci volte migliore</strong>. Erano state tarate su un solo tipo di video.
-          </Box>
+          <StepRow />
+          <RelativeBarChart />
+          <p style={{ textAlign: 'center', color: colors.textDim, fontSize: 'var(--fs-body)', marginTop: '10px' }}>
+            Tolte le regole, il risultato migliorava di circa dieci volte: erano tarate su un solo tipo di video.
+          </p>
         </div>
       ),
 
-      // 5 - Falsi positivi e falsi negativi
+      // 4 - Sbagliare in due modi
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🎯</span> Falsi positivi e falsi negativi
+            <span style={{ fontSize: '28px' }}>🎯</span> Sbagliare in due modi
           </h2>
           <QuadrantGrid />
         </div>
       ),
 
-      // 6 - Simulatore "Precision contro recall"
+      // 5 - Simulatore "Precision contro recall"
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -514,67 +492,48 @@
         </div>
       ),
 
-      // 7 - Un video che rompe tutto
+      // 6 - Due sorprese
       () => (
         <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>💥</span> Un video che rompe tutto
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>😲</span> Due sorprese
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            Un video caricato da un utente, ripreso diversamente: centinaia di battute in pochi minuti. Una regola ("la battuta c'è solo a inizio scambio") sistemava quel video… ma peggiorava il set di verifica.
-          </p>
-          <Box type="info" title="Soluzione">
-            Regole diverse a seconda del tipo di ripresa.
-          </Box>
-          <Box type="tip" title="La lezione qui">
-            Una regola tarata su un caso non generalizza.
-          </Box>
+          <div className="two-col-media" style={{ marginBottom: '16px' }}>
+            <SurpriseCard title="Un video di un utente">
+              <p>Centinaia di battute rilevate in pochi minuti. Una regola sistemava quel video, ma peggiorava la verifica.</p>
+              <p style={{ marginTop: '8px', fontWeight: '700', color: colors.text }}>Soluzione: regole diverse per tipo di ripresa.</p>
+            </SurpriseCard>
+            <SurpriseCard title="Il modello sbagliato">
+              <p>Usavamo una versione vecchia del modello: quella aggiornata era nettamente migliore. E la nostra misura contava ogni fotogramma come un evento a sé.</p>
+            </SurpriseCard>
+          </div>
+          <Box type="danger" title="Controlla le basi">Quale versione sto usando? Sto misurando la cosa giusta?</Box>
         </div>
       ),
 
-      // 8 - Il modello sbagliato
-      () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>🔍</span> Il modello sbagliato
-          </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            Confronto rigoroso con il modello più recente del progetto originale, alle stesse condizioni. Sorpresa: stavamo usando <strong style={{ color: colors.text }}>una versione vecchia e più debole</strong>. Quella aggiornata era nettamente migliore su azioni e scambi.
-          </p>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '14px' }}>
-            E un secondo errore: il nostro modo di misurare contava ogni fotogramma di un'azione come un evento separato.
-          </p>
-          <Box type="danger" title="Controlla le basi">
-            Quale versione sto usando? Sto misurando la cosa giusta?
-          </Box>
-        </div>
-      ),
-
-      // 9 - Validazione e test
+      // 7 - Validazione e test
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '28px' }}>📊</span> Validazione e test
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px' }}>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px', textAlign: 'center' }}>
             Un modello più piccolo, solo per la palla, sembrava migliore sui dati usati per regolarlo. Ma perdeva su quelli mai visti prima.
           </p>
           <ValidationTestCards />
-          <Box type="tip" title="Il giudice è il test">
-            La validazione è spesso ottimista.
-          </Box>
+          <Box type="tip" title="Il giudice è il test">La validazione è spesso ottimista.</Box>
         </div>
       ),
 
-      // 10 - Chiusura
+      // 8 - Chiusura
       () => (
-        <div style={{ padding: '30px', textAlign: 'center' }}>
+        <div style={{ padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Da quel momento, ogni modifica è stata misurata</h2>
-          <Glow color={colors.accent}>
-            <p style={{ color: colors.textDim, fontSize: 'var(--fs-lead)' }}>
-              E il sistema ha iniziato a scontrarsi con la realtà del campo.
-            </p>
-          </Glow>
+          <div className="recap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', maxWidth: '860px', margin: '0 auto 20px' }}>
+            <RecapCard n="1">Le regole di buon senso, non verificate, distruggevano quasi tutto il segnale buono del modello.</RecapCard>
+            <RecapCard n="2">Precisione e richiamo vanno bilanciati, non massimizzati alla cieca.</RecapCard>
+            <RecapCard n="3">Controllare la versione del modello e la correttezza della misura viene prima di ogni ottimizzazione.</RecapCard>
+          </div>
           <Box type="tip" title="La lezione dell'atto">
             Un risultato che "sembra giusto" non è un risultato. Decidono i dati di verifica, misurati bene.
           </Box>
@@ -650,7 +609,7 @@
             </div>
           </div>
           <div className="slide-scroll" style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-            <div className="slide-content" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+            <div className="slide-content slide-content-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
               {slides[current]()}
             </div>
           </div>
