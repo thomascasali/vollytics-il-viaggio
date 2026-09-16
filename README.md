@@ -17,7 +17,7 @@ progetto vero.
 
 | # | Titolo | Argomenti | Slide |
 |---|--------|-----------|-------|
-| 1 | Il punto di partenza | Il problema di un allenatore, cosa vede davvero un computer, il prototipo di tesi | 9 |
+| 1 | Il punto di partenza | Il problema di un allenatore, cosa vede davvero un computer, il prototipo di tesi | 8 |
 | 2 | Dal laboratorio al campo | Stadi come una catena di montaggio, il bug dell'OR, la prima web app, il primo feedback vero | 8 |
 | 3 | Quando sembrava funzionare | Regole "a occhio", falsi positivi e negativi, precisione e richiamo, validazione vs test | 10 |
 | 4 | Il gioco ha le sue regole | Il campo che non si vede, la proiezione in vista dall'alto, riconoscere i giocatori, la grammatica dello scambio | 11 |
@@ -51,6 +51,8 @@ da `file://`.
 ## Crediti
 
 Fotogrammi dal video dimostrativo pubblicato su [vollytics.com](https://vollytics.com).
+
+Il lavoro di partenza è documentato in: A. Zammarchi, *BallVisionAI: un'applicazione di Visione Artificiale per l'analisi automatizzata di partite di Beach Volley*, tesi di laurea magistrale, Università di Bologna – Campus di Cesena, A.A. 2023-24.
 
 ## Licenza
 

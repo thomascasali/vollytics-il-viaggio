@@ -30,7 +30,7 @@ sopra:
 | # | File | Titolo | Accent | Icona | Slide |
 |---|------|--------|--------|-------|-------|
 | — | `index.html` | Vollytics — Il viaggio | — | 🏐 | dashboard |
-| 1 | `atto1-il-punto-di-partenza.html` | Il punto di partenza | coral `#EF5540` | 🎯 | 7 |
+| 1 | `atto1-il-punto-di-partenza.html` | Il punto di partenza | coral `#EF5540` | 🎯 | 8 |
 | 2 | `atto2-dal-laboratorio-al-campo.html` | Dal laboratorio al campo | sole `#F6A93B` | 🧪 | 7 |
 | 3 | `atto3-quando-sembrava-funzionare.html` | Quando sembrava funzionare | rosso `#e0563a` | 📉 | 8 |
 | 4 | `atto4-il-gioco-ha-le-sue-regole.html` | Il gioco ha le sue regole | teal `#1FA9A0` | 📐 | ~11 |
@@ -213,17 +213,25 @@ atti successivi.
 
 ## Vincoli di pubblicazione (non negoziabili)
 
-- Nessun nome di persona (autori della tesi/paper, docenti, collaboratori, atleti), nessuna
-  università. La tesi si cita solo come "un lavoro di tesi universitaria, poi diventato un
-  articolo scientifico in preparazione".
-- Nessun numero del paper e nessuna metrica assoluta del progetto: solo forme qualitative o
-  relative ("gli errori si dimezzano", "circa dieci volte meglio", "da inutilizzabile a
-  utilizzabile").
-- Fotogrammi reali: solo dal video demo già pubblico sulla home di vollytics.com, quelli in
-  `assets/frames/` con il relativo `manifest.json`. Tutto il resto (partite A e B, schemi,
-  simulatori) è illustrazione SVG. Le partite raccontate restano "partita A" (ripresa dal
-  treppiede) e "partita B" (ripresa di lato); i fotogrammi demo illustrano concetti generali,
-  non vanno attribuiti a nessuna delle due.
+- Il paper in preparazione (progetto attuale) resta **anonimo e senza numeri**: nessun nome
+  di persona, nessuna università, nessun numero o metrica assoluta del progetto — solo forme
+  qualitative o relative ("gli errori si dimezzano", "circa dieci volte meglio", "da
+  inutilizzabile a utilizzabile").
+- La **tesi di partenza** invece si può citare per nome, per intero, in una riga piccola
+  (colore `textMuted`) sotto le figure che ne derivano. Testo esatto della citazione (costante
+  `THESIS_CITATION` in ogni file che la usa):
+  > Fonte: A. Zammarchi, *BallVisionAI: un'applicazione di Visione Artificiale per l'analisi
+  > automatizzata di partite di Beach Volley*, tesi di laurea magistrale, Università di
+  > Bologna – Campus di Cesena, A.A. 2023-24.
+- Figure della tesi in `assets/tesi/` (`tesi_frame_annotato.jpg`, `tesi_torneo_parigi.jpg`,
+  `tesi_torneo_tepic.jpg`, `tesi_torneo_uberlandia.jpg`, `tesi_player_desktop.jpg`,
+  `tesi_court2d.jpg`, `tesi_traiettoria_battuta.jpg`): **nessuna necessità di sfocatura**, sono
+  materiale della tesi ormai citata per nome — vanno sempre accompagnate dalla citazione sopra.
+- Fotogrammi reali del progetto attuale: solo dal video demo già pubblico sulla home di
+  vollytics.com, quelli in `assets/frames/` con il relativo `manifest.json`. Tutto il resto
+  (partite A e B, schemi, simulatori) è illustrazione SVG. Le partite raccontate restano
+  "partita A" (ripresa dal treppiede) e "partita B" (ripresa di lato); i fotogrammi demo
+  illustrano concetti generali, non vanno attribuiti a nessuna delle due.
 - Nessun codice sorgente, IP, indirizzo di server, path interno o credenziale.
 - Durata del lavoro raccontato: un'estate (circa cinque settimane intense), sopra le
   fondamenta di una tesi.

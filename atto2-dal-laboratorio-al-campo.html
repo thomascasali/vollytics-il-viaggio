@@ -138,6 +138,9 @@
     const PREV_ACT_HREF = 'atto1-il-punto-di-partenza.html';
     const NEXT_ACT_HREF = 'atto3-quando-sembrava-funzionare.html';
 
+    // Citazione della tesi di partenza (fonte per le figure in assets/tesi/).
+    const THESIS_CITATION = "Fonte: A. Zammarchi, BallVisionAI: un'applicazione di Visione Artificiale per l'analisi automatizzata di partite di Beach Volley, tesi di laurea magistrale, Università di Bologna – Campus di Cesena, A.A. 2023-24";
+
     // Flag globale: true mentre un simulatore cattura tastiera/puntatore, per impedire
     // alla navigazione slide (Spazio/Frecce) di interferire.
     let simActive = false;
@@ -478,10 +481,20 @@
           <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
             <span style={{ fontSize: '28px' }}>💻</span> Da minuti a secondi: nasce l'app
           </h2>
-          <img src="assets/app/app_player.jpg" alt="Schermata reale dell'app: player con overlay, timeline e filtri" draggable="false"
-            style={{ display: 'block', width: '100%', maxWidth: '1100px', height: 'auto', maxHeight: '62dvh', objectFit: 'contain', margin: '0 auto 16px', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: colors.textDim, fontSize: 'var(--fs-body)', textAlign: 'center' }}>
-            <div>carichi il video</div>
+          <div className="two-col-media">
+            <div style={{ textAlign: 'center' }}>
+              <img src="assets/tesi/tesi_player_desktop.jpg" alt="Il player desktop della tesi" draggable="false"
+                style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '46dvh', objectFit: 'contain', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+              <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', fontWeight: '700', marginTop: '8px' }}>Prima — il player desktop della tesi</div>
+              <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)' }}>{THESIS_CITATION}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <img src="assets/app/app_player.jpg" alt="La web app di oggi: player con overlay, timeline e filtri" draggable="false"
+                style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '46dvh', objectFit: 'contain', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+              <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', fontWeight: '700', marginTop: '8px' }}>Dopo — la web app di oggi</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: colors.textDim, fontSize: 'var(--fs-body)', textAlign: 'center', marginTop: '16px' }}>
             <div>l'analisi gira su un server con scheda grafica: da molti minuti a secondi</div>
             <div>guardi il risultato con filtri e timeline</div>
           </div>

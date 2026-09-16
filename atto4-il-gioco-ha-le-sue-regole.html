@@ -99,6 +99,9 @@
     const PREV_ACT_HREF = 'atto3-quando-sembrava-funzionare.html';
     const NEXT_ACT_HREF = 'atto5-cambiare-punto-di-vista.html';
 
+    // Citazione della tesi di partenza (fonte per le figure in assets/tesi/).
+    const THESIS_CITATION = "Fonte: A. Zammarchi, BallVisionAI: un'applicazione di Visione Artificiale per l'analisi automatizzata di partite di Beach Volley, tesi di laurea magistrale, Università di Bologna – Campus di Cesena, A.A. 2023-24";
+
     // Flag globale: true mentre un simulatore sta "catturando" tastiera/puntatore,
     // per impedire alla navigazione slide (Spazio/Frecce) di interferire.
     let simActive = false;
@@ -545,6 +548,13 @@
             <span style={{ fontSize: '28px' }}>🗺️</span> Simulatore — Dalla foto alla mappa
           </h2>
           <RealCourtSimulator />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '18px', paddingTop: '16px', borderTop: `1px solid ${colors.border}` }}>
+            <img src="assets/tesi/tesi_court2d.jpg" alt="Il Court 2D mapper della tesi" style={{ width: '100%', maxWidth: '260px', height: 'auto', borderRadius: '6px', border: `1px solid ${colors.border}` }} />
+            <div style={{ maxWidth: '420px' }}>
+              <p style={{ color: colors.textDim, fontSize: 'var(--fs-sm)' }}>L'idea del campo 2D c'era già nella tesi: noi l'abbiamo resa robusta con la calibrazione manuale.</p>
+              <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '4px' }}>{THESIS_CITATION}</div>
+            </div>
+          </div>
         </div>
       ),
 

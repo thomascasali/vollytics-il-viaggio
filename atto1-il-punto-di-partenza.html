@@ -106,6 +106,10 @@
     const ACT_TITLE = 'Il punto di partenza';
     const NEXT_ACT_HREF = 'atto2-dal-laboratorio-al-campo.html';
 
+    // Citazione della tesi di partenza (fonte per le figure in assets/tesi/): testo esatto
+    // fornito dall'autore, da riportare sempre integrale sotto le figure che ne derivano.
+    const THESIS_CITATION = "Fonte: A. Zammarchi, BallVisionAI: un'applicazione di Visione Artificiale per l'analisi automatizzata di partite di Beach Volley, tesi di laurea magistrale, Università di Bologna – Campus di Cesena, A.A. 2023-24";
+
     // Flag globale: true mentre un simulatore sta "catturando" tastiera/puntatore,
     // per impedire alla navigazione slide (Spazio/Frecce) di interferire.
     let simActive = false;
@@ -490,16 +494,28 @@
 
       // 4 - Il lavoro di partenza: una tesi
       () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
             <span style={{ fontSize: '28px' }}>🎓</span> Il lavoro di partenza: una tesi
           </h2>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '8px' }}>
-            Un lavoro di tesi universitaria, poi diventato un articolo scientifico in preparazione, aveva costruito un primo sistema: dal video di una telecamera riconosceva <strong style={{ color: colors.text }}>giocatori, palla, cinque gesti</strong> e il campo. Aveva imparato dalle <strong style={{ color: colors.text }}>riprese ufficiali dei tornei internazionali</strong>: telecamera fissa in fondo al campo, in alto, tutto il campo inquadrato.
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '8px', textAlign: 'center' }}>
+            Un lavoro di tesi universitaria, poi diventato un articolo scientifico in preparazione, aveva costruito un primo sistema: dal video di una telecamera riconosceva <strong style={{ color: colors.text }}>giocatori, palla, cinque gesti</strong> e il campo. Ha imparato dalle <strong style={{ color: colors.text }}>riprese ufficiali dei tornei internazionali</strong>: telecamera fissa in fondo al campo, in alto, tutto il campo inquadrato.
           </p>
-          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px' }}>
+          <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)', marginBottom: '18px', textAlign: 'center' }}>
             Poi, con delle regole, raggruppava i gesti in scambi e stimava il punteggio.
           </p>
+          <img src="assets/tesi/tesi_frame_annotato.jpg" alt="Fotogramma di torneo annotato con i rettangoli di giocatori, palla e gesto"
+            style={{ display: 'block', width: '100%', maxWidth: '900px', height: 'auto', maxHeight: '62dvh', margin: '0 auto', borderRadius: '8px', border: `1px solid ${colors.border}` }} />
+          <div style={{ textAlign: 'center', color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '8px' }}>{THESIS_CITATION}</div>
+        </div>
+      ),
+
+      // 5 - I cinque gesti che aveva imparato
+      () => (
+        <div style={{ padding: '30px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🖐️</span> I cinque gesti che aveva imparato
+          </h2>
           <GestureGallery />
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMuted, fontSize: 'var(--fs-sm)', marginTop: '16px', justifyContent: 'center', textAlign: 'center' }}>
             <span>💡</span><span>Regola d'oro: le immagini della stessa partita non stanno mai sia tra quelle per imparare sia tra quelle per verificare.</span>
@@ -507,7 +523,7 @@
         </div>
       ),
 
-      // 5 - Come si insegna: decine di migliaia di rettangoli
+      // 6 - Come si insegna: decine di migliaia di rettangoli
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -520,7 +536,7 @@
         </div>
       ),
 
-      // 6 - Tutto in fila, tutto appeso ai gesti
+      // 7 - Tutto in fila, tutto appeso ai gesti
       () => (
         <div style={{ padding: '30px' }}>
           <h2 style={{ color: colors.accent, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -533,7 +549,7 @@
         </div>
       ),
 
-      // 7 - Chiusura
+      // 8 - Chiusura
       () => (
         <div style={{ padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '60vh' }}>
           <h2 style={{ color: colors.accent, marginBottom: '20px' }}>Da qui è partito il nostro lavoro</h2>
