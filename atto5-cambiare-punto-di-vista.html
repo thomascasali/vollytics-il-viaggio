@@ -63,8 +63,8 @@
     .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     .two-col-media { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .angles-row { display: grid; gap: 10px; justify-content: center; }
-    .angles-row-tesi { grid-template-columns: repeat(4, minmax(0, 108px)); }
-    .angles-row-now { grid-template-columns: repeat(3, minmax(0, 146px)); }
+    .angles-row-tesi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .angles-row-now { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -77,7 +77,7 @@
       .rule-row { flex-wrap: wrap; }
       .camera-compare { grid-template-columns: 1fr !important; }
       .two-col-media { grid-template-columns: 1fr !important; }
-      .angles-row-tesi, .angles-row-now { grid-template-columns: repeat(2, minmax(0, 120px)) !important; }
+      .angles-row-tesi, .angles-row-now { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -684,7 +684,7 @@
           </div>
 
           <Box type="tip" title="È overfitting">
-            Il modello aveva imparato come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>, non cos'è davvero: come studiare a memoria gli esercizi invece del metodo.
+            Aveva imparato come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>, non cos'è davvero una schiacciata.
           </Box>
         </div>
       ),
