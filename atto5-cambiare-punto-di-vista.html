@@ -62,6 +62,9 @@
     .slide-scroll { -webkit-overflow-scrolling: touch; padding-bottom: 24px; }
     .slide-content-center { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
     .two-col-media { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .angles-row { display: grid; gap: 10px; justify-content: center; }
+    .angles-row-tesi { grid-template-columns: repeat(4, minmax(0, 108px)); }
+    .angles-row-now { grid-template-columns: repeat(3, minmax(0, 146px)); }
     @media (max-width: 768px) {
       .slide-content { padding: 16px !important; }
       .top-bar { padding: 0 10px !important; }
@@ -74,6 +77,7 @@
       .rule-row { flex-wrap: wrap; }
       .camera-compare { grid-template-columns: 1fr !important; }
       .two-col-media { grid-template-columns: 1fr !important; }
+      .angles-row-tesi, .angles-row-now { grid-template-columns: repeat(2, minmax(0, 120px)) !important; }
     }
     @media (max-width: 480px) {
       .top-bar > div:first-child span:nth-child(4) { display: none; }
@@ -105,11 +109,6 @@
     // Citazione della tesi di partenza (fonte per le figure in assets/tesi/).
     const THESIS_CITATION = "Fonte: A. Zammarchi, BallVisionAI: un'applicazione di Visione Artificiale per l'analisi automatizzata di partite di Beach Volley, tesi di laurea magistrale, Università di Bologna – Campus di Cesena, A.A. 2023-24";
 
-    // Se il docente fornisce un fotogramma reale della Partita B (di lato), valorizzare
-    // con il percorso del file (es. 'assets/frames/frame_partita_b.jpg'): al posto del
-    // pannello tratteggiato comparirà l'immagine.
-    const PARTITA_B_SRC = null;
-
     // Flag globale: true mentre un simulatore sta "catturando" tastiera/puntatore.
     let simActive = false;
 
@@ -130,9 +129,9 @@
       );
     };
 
-    const Glow = ({ children, color = colors.accent }) => (
+    const Glow = ({ children, color = colors.accent, pad = '20px' }) => (
       <div style={{ position: 'relative', padding: '2px', borderRadius: '12px', background: `linear-gradient(135deg, ${color}40, transparent, ${color}20)` }}>
-        <div style={{ background: colors.bgCard, borderRadius: '10px', padding: '20px' }}>{children}</div>
+        <div style={{ background: colors.bgCard, borderRadius: '10px', padding: pad }}>{children}</div>
       </div>
     );
 
@@ -638,41 +637,54 @@
         </div>
       ),
 
-      // 2 - Partita B: un'inquadratura mai vista (fusione partita B + generalizzazione)
+      // 2 - Le riprese dei tornei e i nostri video (fusione partita B + generalizzazione)
       () => (
-        <div style={{ padding: '30px' }}>
-          <h2 style={{ color: colors.accent, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>📹</span> Partita B: un'inquadratura mai vista
+        <div style={{ padding: '14px 30px' }}>
+          <h2 style={{ color: colors.accent, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>📹</span> Le riprese dei tornei e i nostri video
           </h2>
-          <Glow>
+          <Glow pad="12px 16px">
             <p style={{ color: colors.textDim, fontSize: 'var(--fs-body)' }}>
-              Il modello aveva imparato dalle riprese dei tornei: telecamera <strong style={{ color: colors.text }}>alta, in fondo al campo</strong>. I nostri video sono un'altra cosa: telecamera <strong style={{ color: colors.text }}>bassa, a bordo campo, a volte di lato</strong>. Sulla partita A regge; sulla partita B, ripresa di lato, il sistema basato sui gesti <strong style={{ color: colors.text }}>crolla</strong>: centinaia di battute e tocchi inventati. Da qui è partito il nuovo percorso: un'estate di test alla ricerca della soluzione migliore.
+              Il modello aveva imparato dalle riprese dei tornei: telecamera <strong style={{ color: colors.text }}>alta, tutto il campo</strong>. I nostri video sono un'altra cosa: <strong style={{ color: colors.text }}>bassi, a bordo campo</strong>. Sulla partita ripresa di lato il sistema basato sui gesti <strong style={{ color: colors.text }}>crolla</strong>: centinaia di tocchi inventati. Da qui l'estate di test.
             </p>
           </Glow>
-          <div className="camera-compare" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', margin: '16px 0' }}>
-            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-              <img src="assets/tesi/tesi_torneo_parigi.jpg" alt="Fotogramma di torneo internazionale: telecamera alta, in fondo al campo" style={{ width: '100%', height: 'auto', borderRadius: '6px', display: 'block' }} />
-              <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginTop: '8px' }}>Tornei: telecamera alta, in fondo al campo (training)</div>
-              <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '4px' }}>{THESIS_CITATION}</div>
-            </div>
-            <div style={{ background: colors.bgCard, border: `2px solid ${colors.teal}`, borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-              <img src="assets/frames/frame_court.jpg" alt="Fotogramma di partita A: telecamera bassa, a bordo campo" style={{ width: '100%', height: 'auto', borderRadius: '6px', display: 'block' }} />
-              <div style={{ color: colors.textDim, fontSize: 'var(--fs-sm)', marginTop: '8px' }}>I nostri video: bassa, a bordo campo (partita A)</div>
-            </div>
-            {PARTITA_B_SRC ? (
-              <div style={{ background: colors.bgCard, border: `2px solid ${colors.danger}`, borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                <img src={PARTITA_B_SRC} alt="Fotogramma di partita B: telecamera di lato" style={{ width: '100%', height: 'auto', borderRadius: '6px', display: 'block' }} />
-                <div style={{ color: colors.danger, fontWeight: '700', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>Partita B: di lato — il sistema crolla</div>
-              </div>
-            ) : (
-              <div style={{ background: colors.bgCard, border: `2px dashed ${colors.danger}`, borderRadius: '8px', padding: '16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '140px' }}>
-                <div style={{ fontSize: '30px' }}>🎥</div>
-                <div style={{ color: colors.danger, fontWeight: '700', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>Partita B: di lato — il sistema crolla</div>
-              </div>
-            )}
+
+          <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px', margin: '10px 0 6px' }}>
+            Le riprese su cui il modello aveva imparato: telecamera alta, tutto il campo
           </div>
+          <div className="angles-row angles-row-tesi">
+            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/tesi_1_alta_fondocampo.jpg" alt="Ripresa torneo: telecamera alta, fondo campo" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/tesi_2_alta_fondocampo.jpg" alt="Ripresa torneo: telecamera alta, fondo campo" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/tesi_3_alta_fondocampo.jpg" alt="Ripresa torneo: telecamera alta, fondo campo" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+            <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/tesi_4_alta_laterale.jpg" alt="Ripresa torneo: telecamera alta, laterale" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+          </div>
+          <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', marginTop: '6px', textAlign: 'center' }}>{THESIS_CITATION}</div>
+
+          <div style={{ color: colors.textMuted, fontSize: 'var(--fs-xs)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px', margin: '10px 0 6px' }}>
+            I nostri video: telecamera bassa, a bordo campo, di lato, dietro la linea di fondo
+          </div>
+          <div className="angles-row angles-row-now">
+            <div style={{ background: colors.bgCard, border: `2px solid ${colors.accent}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/now_1_bordocampo_tripode.jpg" alt="Nostro video: telecamera bassa, a bordo campo, su treppiede" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+            <div style={{ background: colors.bgCard, border: `2px solid ${colors.accent}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/now_2_laterale_bassa.jpg" alt="Nostro video: telecamera bassa, laterale" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+            <div style={{ background: colors.bgCard, border: `2px solid ${colors.accent}`, borderRadius: '8px', padding: '6px' }}>
+              <img src="assets/angles/now_3_fondocampo_bassa.jpg" alt="Nostro video: telecamera bassa, dietro la linea di fondo" style={{ width: '100%', height: 'auto', borderRadius: '5px', display: 'block' }} />
+            </div>
+          </div>
+
           <Box type="tip" title="È overfitting">
-            Il modello aveva imparato "come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>", non cos'è davvero una schiacciata: come studiare a memoria gli esercizi del libro invece di capire il metodo.
+            Il modello aveva imparato come appare una schiacciata <strong style={{ color: colors.text }}>da quella telecamera</strong>, non cos'è davvero: come studiare a memoria gli esercizi invece del metodo.
           </Box>
         </div>
       ),
